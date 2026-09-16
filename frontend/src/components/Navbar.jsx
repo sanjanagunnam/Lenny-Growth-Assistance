@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Cpu, 
   Sparkle, 
@@ -8,8 +8,49 @@ import {
   Article, 
   ChatCircleText, 
   ArrowsClockwise,
-  Layout
+  Layout,
+  CaretDown,
+  Check,
+  Lightning
 } from '@phosphor-icons/react';
+
+const OLLAMA_MODELS = [
+  { 
+    id: 'glm-5.3-flash', 
+    label: 'GLM-5.3-Flash', 
+    tag: 'Fast • Default', 
+    icon: Lightning, 
+    desc: 'Ultra-fast growth & product reasoning model' 
+  },
+  { 
+    id: 'llama3.2', 
+    label: 'Llama 3.2 3B', 
+    tag: 'Meta Instruct', 
+    icon: Cpu, 
+    desc: 'Meta 3B high-density instruction model' 
+  },
+  { 
+    id: 'phi3', 
+    label: 'Phi-3 Mini 128k', 
+    tag: 'Reasoning', 
+    icon: Cpu, 
+    desc: 'Microsoft 128k context product reasoning' 
+  },
+  { 
+    id: 'qwen2.5', 
+    label: 'Qwen 2.5 3B', 
+    tag: 'Operator', 
+    icon: Cpu, 
+    desc: 'Alibaba high-speed operator model' 
+  },
+  { 
+    id: 'mistral', 
+    label: 'Mistral 7B', 
+    tag: 'Dense', 
+    icon: Cpu, 
+    desc: 'Dense European startup instruction model' 
+  },
+];
 
 export default function Navbar({
   provider,
@@ -25,6 +66,21 @@ export default function Navbar({
   hasActiveArtifact,
 }) {
   const isOllama = provider === 'ollama';
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const activeOllamaModel = OLLAMA_MODELS.find((m) => m.id === model) || OLLAMA_MODELS[0];
 
   return (
     <header className="h-14 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur px-4 flex items-center justify-between select-none z-30">
@@ -55,7 +111,7 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* Middle section: Mode selector & Telemetry */}
+      {/* Middle section: Mode selector */}
       <div className="hidden md:flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-0.5 rounded-lg">
         <button
           onClick={() => setMode('chat')}
@@ -98,16 +154,19 @@ export default function Navbar({
           <div className="flex items-center gap-1.5" title={health.ollama ? "Ollama Daemon Connected" : "Ollama Daemon Offline"}>
             <Cpu size={13} className={health.ollama ? "text-emerald-400" : "text-amber-500"} />
             <span className="text-[11px] text-zinc-400">ollama</span>
-            <Circle size={6} weight="fill" className={health.ollama ? "text-emerald-400" : "text-amber-500"} />
+            <Circle size={6} weight="fill" className={health.ollama ? "text-emerald-400 animate-pulse" : "text-amber-500"} />
           </div>
         </div>
 
-        {/* Dynamic Provider Selector */}
-        <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-md p-0.5">
+        {/* Dynamic Provider & Model Selector */}
+        <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-md p-0.5 gap-1">
+          {/* Provider Toggle: Ollama */}
           <button
             onClick={() => {
               setProvider('ollama');
-              setModel('llama3.2');
+              if (model === 'claude-3-5-sonnet-latest') {
+                setModel('glm-5.3-flash');
+              }
             }}
             className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded transition-colors ${
               isOllama
@@ -116,8 +175,72 @@ export default function Navbar({
             }`}
           >
             <Cpu size={13} />
-            <span>Ollama (Llama 3.2)</span>
+            <span>Ollama</span>
           </button>
+
+          {/* Ollama Model Dropdown (Active when Ollama is selected) */}
+          {isOllama && (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                id="model-selector-dropdown-btn"
+                className="flex items-center gap-1.5 px-2 py-1 text-xs font-mono rounded bg-zinc-950/80 border border-amber-500/30 text-amber-300 hover:border-amber-400 transition-colors"
+                title="Select Ollama Model"
+              >
+                <Lightning size={12} weight="fill" className="text-amber-400" />
+                <span className="font-semibold">{activeOllamaModel.label}</span>
+                <CaretDown size={11} className={`text-zinc-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-64 bg-zinc-950 border border-zinc-800 rounded-lg shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95">
+                  <div className="px-3 py-1 text-[10px] uppercase font-mono tracking-wider text-zinc-500 border-b border-zinc-800/80 mb-1">
+                    Select Ollama Model
+                  </div>
+                  {OLLAMA_MODELS.map((m) => {
+                    const isSelected = model === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        id={`model-option-${m.id}`}
+                        onClick={() => {
+                          setModel(m.id);
+                          setIsDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
+                          isSelected
+                            ? 'bg-amber-500/10 text-amber-300 font-medium'
+                            : 'text-zinc-300 hover:bg-zinc-900 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Check size={12} className={isSelected ? 'text-amber-400 opacity-100' : 'opacity-0'} />
+                          <div>
+                            <div className="font-medium text-xs flex items-center gap-1.5">
+                              <span>{m.label}</span>
+                              {m.id === 'glm-5.3-flash' && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                              )}
+                            </div>
+                            <div className="text-[10px] text-zinc-500 font-mono">{m.desc}</div>
+                          </div>
+                        </div>
+                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
+                          isSelected
+                            ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                        }`}>
+                          {m.tag}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Provider Toggle: Claude 3.5 */}
           <button
             onClick={() => {
               setProvider('anthropic');

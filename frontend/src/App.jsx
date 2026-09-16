@@ -10,7 +10,7 @@ export default function App() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [provider, setProvider] = useState('ollama');
-  const [model, setModel] = useState('llama3.2');
+  const [model, setModel] = useState('glm-5.3-flash');
   const [mode, setMode] = useState('chat'); // 'chat' | 'ship30'
   const [activeArtifact, setActiveArtifact] = useState(null);
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
         description="Base URL for local Ollama daemon",
     )
     OLLAMA_DEFAULT_MODEL: str = Field(
-        default="llama3.2",
+        default="glm-5.3-flash",
         description="Default model for Ollama generation",
     )
     OLLAMA_EMBED_MODEL: str = Field(

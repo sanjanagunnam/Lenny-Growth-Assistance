@@ -115,6 +115,57 @@ async def health_check() -> HealthResponse:
     )
 
 
+@router.get("/api/v1/models", tags=["Diagnostics"])
+async def list_available_models() -> Dict[str, Any]:
+    """Return available LLM models grouped by provider, highlighting glm-5.3-flash."""
+    return {
+        "providers": {
+            "ollama": [
+                {
+                    "id": "glm-5.3-flash",
+                    "name": "GLM-5.3-Flash (Ultra-Fast)",
+                    "description": "Ultra-fast product & growth reasoning model",
+                    "recommended": True,
+                },
+                {
+                    "id": "llama3.2",
+                    "name": "Llama 3.2 3B Instruct",
+                    "description": "Meta 3B high-density instruction model",
+                    "recommended": False,
+                },
+                {
+                    "id": "phi3",
+                    "name": "Phi-3 Mini 128k (Reasoning)",
+                    "description": "Microsoft 128k context product reasoning",
+                    "recommended": False,
+                },
+                {
+                    "id": "qwen2.5",
+                    "name": "Qwen 2.5 3B (Multilingual)",
+                    "description": "Alibaba high-speed operator model",
+                    "recommended": False,
+                },
+                {
+                    "id": "mistral",
+                    "name": "Mistral 7B (Operator)",
+                    "description": "Dense European startup instruction model",
+                    "recommended": False,
+                },
+            ],
+            "anthropic": [
+                {
+                    "id": "claude-3-5-sonnet-latest",
+                    "name": "Claude 3.5 Sonnet",
+                    "description": "State-of-the-art cloud frontier intelligence",
+                    "recommended": True,
+                },
+            ],
+        },
+        "default_provider": "ollama",
+        "default_model": "glm-5.3-flash",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Session Management
 # ---------------------------------------------------------------------------

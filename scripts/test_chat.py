@@ -6,6 +6,7 @@ client = httpx.Client(timeout=300.0)
 resp = client.post("http://localhost:8000/api/v1/chat", json={
     "message": "What are the 3 non-obvious retention levers recommended by Lenny's guests for consumer apps?",
     "provider": "ollama",
+    "model": "glm-5.3-flash",
     "mode": "chat",
 })
 elapsed = round(time.time() - t0, 2)
