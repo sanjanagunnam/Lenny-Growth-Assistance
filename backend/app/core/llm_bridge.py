@@ -108,7 +108,7 @@ class LLMBridge:
         except httpx.TimeoutException as err:
             logger.warning("Ollama request timed out after %.1fs: %s", self.ollama_timeout, err)
             raise LLMTimeoutError(
-                "Local Ollama model timed out (15s). Ensure Ollama is running, or toggle the model provider to 'Anthropic Claude' in the top bar."
+                f"Local Ollama model timed out ({int(self.ollama_timeout)}s). Ensure Ollama is running, or toggle the model provider to 'Anthropic Claude' in the top bar."
             ) from err
 
         except httpx.HTTPStatusError as err:

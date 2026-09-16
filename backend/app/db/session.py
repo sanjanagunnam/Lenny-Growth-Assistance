@@ -31,9 +31,35 @@ SessionLocal = sessionmaker(
 )
 
 
+def _create_sqlite_fallback() -> None:
+    """Seamlessly reconfigure database engine to use local SQLite when PostgreSQL is offline."""
+    global engine, SessionLocal, is_sqlite
+    logger.info("Activating seamless local SQLite database fallback (lenny_growth_local.db)...")
+    is_sqlite = True
+    engine = create_engine(
+        "sqlite:///./lenny_growth_local.db",
+        connect_args={"check_same_thread": False},
+    )
+    SessionLocal = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=engine,
+    )
+    Base.metadata.create_all(bind=engine)
+    logger.info("Local SQLite database initialized successfully.")
+
+
 def get_db() -> Generator[SQLAlchemySession, None, None]:
-    """FastAPI dependency yielding a scoped database session."""
-    db = SessionLocal()
+    """FastAPI dependency yielding a scoped database session with seamless fallback."""
+    global engine, SessionLocal
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+    except Exception as err:
+        logger.warning("Database connection error before route (%s). Activating local SQLite fallback.", err)
+        _create_sqlite_fallback()
+        db = SessionLocal()
+
     try:
         yield db
     finally:
@@ -52,7 +78,9 @@ def ping_db() -> bool:
 
 
 def init_db(max_retries: int = 5, initial_backoff: float = 1.0) -> None:
-    """Create tables with exponential backoff retry to handle container initialization."""
+    """Create tables with exponential backoff retry.
+    Falls back to local SQLite if PostgreSQL is unreachable."""
+    global engine, SessionLocal
     backoff = initial_backoff
     for attempt in range(1, max_retries + 1):
         try:
@@ -62,6 +90,13 @@ def init_db(max_retries: int = 5, initial_backoff: float = 1.0) -> None:
             return
         except (OperationalError, DatabaseError) as err:
             if attempt == max_retries:
+                if not is_sqlite:
+                    logger.warning(
+                        "PostgreSQL is offline (%s). Seamlessly activating local SQLite persistence fallback.",
+                        err,
+                    )
+                    _create_sqlite_fallback()
+                    return
                 logger.error("Max database initialization retries (%d) reached: %s", max_retries, err)
                 raise
             logger.warning(

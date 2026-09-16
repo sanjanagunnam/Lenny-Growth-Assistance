@@ -51,16 +51,19 @@ class AgentOrchestrator:
     def __init__(self, llm_bridge: Optional[LLMBridge] = None):
         self.llm_bridge = llm_bridge or LLMBridge()
 
-    def _format_context_block(self, sources: List[Dict[str, Any]]) -> str:
-        """Format retrieved chunks into an unambiguous context block for the LLM."""
+    def _format_context_block(self, sources: List[Dict[str, Any]], max_chunks: int = 2, max_chars_per_chunk: int = 1200) -> str:
+        """Format retrieved chunks into a concise, high-signal context block for the LLM."""
         if not sources:
             return ""
 
         blocks = []
-        for idx, s in enumerate(sources, 1):
+        # Keep top N most relevant chunks to preserve low latency on CPU
+        for idx, s in enumerate(sources[:max_chunks], 1):
             guest = s.get("guest_name", "Unknown Guest")
             file_name = s.get("source_file", "Transcript")
             content = s.get("content", "").strip()
+            if len(content) > max_chars_per_chunk:
+                content = content[:max_chars_per_chunk] + "..."
             sim = s.get("similarity", 0.0)
             blocks.append(
                 f"[Chunk {idx} | Source: {file_name} | Guest: {guest} | Relevance: {sim:.2f}]\n{content}"
