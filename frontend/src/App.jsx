@@ -3,7 +3,7 @@ import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
 import ArtifactViewer from './components/ArtifactViewer';
-import { WarningCircle } from '@phosphor-icons/react';
+import { WarningCircle, Lightning, ArrowClockwise, X } from '@phosphor-icons/react';
 
 export default function App() {
   const [sessions, setSessions] = useState([]);
@@ -17,6 +17,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorBanner, setErrorBanner] = useState(null);
+  const [circuitBreakerToast, setCircuitBreakerToast] = useState(null); // { message, lastPrompt }
 
   const [health, setHealth] = useState({
     status: 'healthy',
@@ -104,9 +105,22 @@ export default function App() {
   };
 
   // 5. Send Message & Chat Generation
-  const handleSendMessage = async (text) => {
+  const handleSendMessage = async (text, overrideMode = null, overrideProvider = null) => {
     setErrorBanner(null);
     setIsGenerating(true);
+
+    const activeMode = overrideMode || mode;
+    if (overrideMode && overrideMode !== mode) {
+      setMode(overrideMode);
+    }
+
+    const activeProvider = overrideProvider || provider;
+    if (overrideProvider && overrideProvider !== provider) {
+      setProvider(overrideProvider);
+      if (overrideProvider === 'anthropic') {
+        setModel('claude-3-5-sonnet-latest');
+      }
+    }
 
     // Optimistically append user message
     const tempUserMsg = {
@@ -121,9 +135,9 @@ export default function App() {
       const payload = {
         message: text,
         session_id: activeSessionId || undefined,
-        provider,
-        model,
-        mode,
+        provider: activeProvider,
+        model: activeProvider === 'anthropic' ? 'claude-3-5-sonnet-latest' : model,
+        mode: activeMode,
       };
 
       const res = await fetch('/api/v1/chat', {
@@ -139,12 +153,23 @@ export default function App() {
           errData?.detail?.suggestion ||
           errData?.message ||
           `Request failed with status ${res.status}`;
+
+        // Circuit breaker check: If 504 or timeout error from Ollama
+        if (res.status === 504 || errData?.detail?.error === 'LLM_TIMEOUT' || detailMsg.toLowerCase().includes('timed out')) {
+          setCircuitBreakerToast({
+            message: detailMsg,
+            lastPrompt: text,
+          });
+        }
         throw new Error(detailMsg);
       }
 
       const data = await res.json();
 
-      // Append assistant message
+      // Successful response dismisses circuit breaker toast
+      setCircuitBreakerToast(null);
+
+      // Append assistant message with grounding telemetry
       const assistantMsg = {
         id: data.message_id || Date.now() + 1,
         role: 'assistant',
@@ -152,6 +177,8 @@ export default function App() {
         provider: data.provider_used,
         sources: data.sources || [],
         artifact: data.artifact,
+        grounding_confidence: data.grounding_confidence,
+        epistemic_status: data.epistemic_status,
         created_at: new Date().toISOString(),
       };
 
@@ -185,6 +212,16 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleSwitchToClaudeAndRetry = () => {
+    if (!circuitBreakerToast?.lastPrompt) return;
+    const promptToRetry = circuitBreakerToast.lastPrompt;
+    setCircuitBreakerToast(null);
+    setErrorBanner(null);
+    setProvider('anthropic');
+    setModel('claude-3-5-sonnet-latest');
+    handleSendMessage(promptToRetry, mode, 'anthropic');
   };
 
   const handleOpenArtifact = (art) => {
@@ -223,6 +260,52 @@ export default function App() {
             Dismiss
           </button>
         </div>
+      )}
+
+      {/* Circuit Breaker Non-Blocking Toast Banner */}
+      {circuitBreakerToast && (
+        <aside
+          aria-label="Operational Alert"
+          className="fixed bottom-20 right-6 z-50 max-w-md w-full p-4 rounded-xl bg-zinc-900 border border-amber-500/40 shadow-2xl shadow-amber-500/10 backdrop-blur-md flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2.5">
+              <div className="w-6 h-6 rounded-md bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 flex-shrink-0 mt-0.5">
+                <Lightning size={14} weight="fill" />
+              </div>
+              <div>
+                <h4 className="text-xs font-semibold text-zinc-100 mb-0.5">
+                  Local Model Timeout (15s Circuit Breaker)
+                </h4>
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  {circuitBreakerToast.message}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setCircuitBreakerToast(null)}
+              className="text-zinc-500 hover:text-zinc-300 p-1"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-1 border-t border-zinc-800/80">
+            <button
+              onClick={() => setCircuitBreakerToast(null)}
+              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
+            >
+              Dismiss
+            </button>
+            <button
+              onClick={handleSwitchToClaudeAndRetry}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold transition-all shadow-sm"
+            >
+              <ArrowClockwise size={13} weight="bold" />
+              <span>Switch to Claude & Retry</span>
+            </button>
+          </div>
+        </aside>
       )}
 
       {/* Main Split-View Workspace */}

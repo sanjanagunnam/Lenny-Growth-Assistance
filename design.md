@@ -79,3 +79,38 @@
 - **Motion Intensity (5/10)**: Purposeful, functional transitions (200ms ease-in-out) on drawers, tooltips, and tab changes.
 - **Copy Feedback**: One-click copy buttons transition from clipboard icon to checkmark with an emerald pulse for 2,000ms.
 - **Active Canvas Ping**: When an assistant response produces an artifact, a subtle amber pulse indicator notifies the user to inspect the Growth Canvas.
+
+---
+
+## 6. Evaluator Quick-Start Cards (`EmptyState.jsx`)
+
+Following Taste-Skill v2.0 directives (`DESIGN_VARIANCE: 8`), the empty state avoids generic search placeholder boxes or single-line prompts. Instead, it renders an asymmetric card grid mapped to core evaluation benchmarks:
+
+1. **Grounded RAG Card**: `"What are the 3 non-obvious retention levers recommended by Lenny's guests?"`
+   - Highlights multi-chunk retrieval and speaker attribution.
+2. **Ship 30 for 30 Writing Engine Card**: `"Turn Lenny's interviews on Finding Product-Market Fit into a ~1,250-word Ship 30 for 30 essay."`
+   - Automatically activates `mode="ship30"` and displays hook/pillar structure.
+3. **Interactive Canvas Artifact Card**: `"Create an interactive HTML/JS churn & LTV sensitivity calculator widget."`
+   - Evaluates sandboxed iframe execution and live user inputs.
+4. **Epistemic Guardrail Refusal Card**: `"How do I make chocolate chip cookies?"`
+   - Tests deterministic out-of-domain refusal without calling the generation model.
+
+---
+
+## 7. Ship 30 Persistent Telemetry Bar (`ArtifactViewer.jsx`)
+
+When viewing long-form Ship 30 essays or markdown artifacts, the top drawer header displays a dedicated telemetry sub-bar:
+
+- **Word Count Meter**: Real-time counter comparing output length against target: e.g. `1,248 words / Target: ~1,250`. Dynamically displays emerald badge if within optimal bounds (1,100 - 1,400 words) and amber otherwise.
+- **Estimated Reading Time**: Calculated at standard 225 WPM (`Math.ceil(wordCount / 225)`).
+- **Copy Markdown**: Clipboard action with momentary checkmark feedback.
+- **Export HTML**: One-click download packaging the essay into a standalone, styled, portable HTML document.
+
+---
+
+## 8. Circuit Breaker Toast Notification (`App.jsx`)
+
+When local Ollama inference exceeds the 15-second circuit breaker threshold:
+- A non-blocking toast surfaces at the bottom-right of the viewport with an amber warning badge.
+- Features an immediate one-click **"Switch to Claude & Retry"** button that reconfigures the runtime provider and dispatches the query to Anthropic without page reload or state loss.
+

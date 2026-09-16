@@ -12,6 +12,7 @@ import {
   WarningCircle,
   Lightning
 } from '@phosphor-icons/react';
+import EmptyState from './EmptyState';
 
 export default function ChatWindow({
   messages,
@@ -61,46 +62,27 @@ export default function ChatWindow({
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6">
         {messages.length === 0 ? (
-          /* Empty State */
-          <div className="h-full flex flex-col items-center justify-center text-center max-w-lg mx-auto p-4 select-none">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 shadow-lg">
-              <Lightning size={24} weight="fill" />
-            </div>
-            <h2 className="text-base font-semibold text-zinc-100 mb-1">
-              {mode === 'ship30' ? 'Ship 30 for 30 Writing Engine' : 'Lenny Growth Strategic Partner'}
-            </h2>
-            <p className="text-xs text-zinc-400 mb-6 leading-relaxed">
-              {mode === 'ship30'
-                ? 'Convert grounded product insights into high-impact, viral ~1,250-word essays with punchy hooks and structured pillars.'
-                : 'Ask tactical questions on growth loops, product strategy, founder mode, and metrics grounded directly in Lenny’s Podcast transcripts.'}
-            </p>
-
-            {/* Quick Prompt Starters */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full text-left">
-              {[
-                "How does Airbnb design organic host-guest loops?",
-                "Explain Shreyas Doshi's LNO framework with a checklist",
-                "What is Founder Mode and how should leaders apply it?",
-                "Draft a Ship 30 essay on high-agency product management",
-              ].map((promptText) => (
-                <button
-                  key={promptText}
-                  onClick={() => onSendMessage(promptText)}
-                  className="p-2.5 rounded-lg bg-zinc-900/70 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-300 hover:text-zinc-100 transition-all text-left group"
-                >
-                  <span className="group-hover:text-amber-300 transition-colors">
-                    "{promptText}"
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <EmptyState 
+            onSelectPreset={(presetPrompt, presetMode) => onSendMessage(presetPrompt, presetMode)} 
+            mode={mode} 
+          />
         ) : (
           messages.map((msg, index) => {
             const isUser = msg.role === 'user';
             const hasSources = msg.sources && msg.sources.length > 0;
             const hasArtifact = msg.artifact_content || (msg.artifact && msg.artifact.content);
             const isSourcesExpanded = !!expandedSources[msg.id || index];
+
+            // Grounding metrics calculation
+            const isGrounded = msg.epistemic_status === 'GROUNDED';
+            const isPartial = msg.epistemic_status === 'PARTIAL';
+            const isRefusal = msg.epistemic_status === 'REFUSAL';
+            const confidenceScore = msg.grounding_confidence != null && msg.grounding_confidence > 0
+              ? msg.grounding_confidence
+              : (hasSources ? (msg.sources.reduce((acc, s) => acc + (s.similarity || 0), 0) / msg.sources.length) : 0);
+            const matchPct = Math.round(confidenceScore * 100);
+            const citedEpisodes = [...new Set(msg.sources?.map(s => s.source_file) || [])];
+            const citedCount = citedEpisodes.length || (hasSources ? msg.sources.length : 0);
 
             return (
               <div
@@ -116,6 +98,35 @@ export default function ChatWindow({
 
                 {/* Message Body */}
                 <div className={`space-y-2 max-w-[88%] ${isUser ? 'items-end' : 'items-start'}`}>
+                  {/* Inline Telemetry Badge for Assistant */}
+                  {!isUser && (
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {hasSources ? (
+                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono text-[10px] border shadow-xs ${
+                          isGrounded
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                            : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isGrounded ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                          <span className="font-semibold">{matchPct}% Match</span>
+                          <span className="text-zinc-500">•</span>
+                          <span>{citedCount} Episode{citedCount !== 1 ? 's' : ''} Cited</span>
+                        </div>
+                      ) : isRefusal ? (
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono text-[10px] border bg-zinc-900 border-zinc-800 text-zinc-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                          <span>Epistemic Guardrail • Refusal</span>
+                        </div>
+                      ) : null}
+
+                      {msg.provider && (
+                        <span className="font-mono text-[9px] text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-900/60 border border-zinc-800">
+                          {msg.provider}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   <div
                     className={`p-4 rounded-xl text-xs leading-relaxed ${
                       isUser
@@ -136,38 +147,43 @@ export default function ChatWindow({
 
                   {/* Grounding Citations Drawer */}
                   {!isUser && hasSources && (
-                    <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 overflow-hidden text-[11px]">
+                    <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 overflow-hidden text-[11px] w-full">
                       <button
                         onClick={() => toggleSources(msg.id || index)}
                         className="w-full px-3 py-1.5 flex items-center justify-between text-zinc-400 hover:text-zinc-200 transition-colors"
                       >
                         <div className="flex items-center gap-1.5 font-mono text-[10px] text-amber-400/90">
                           <BookBookmark size={12} weight="bold" />
-                          <span>Grounded Sources ({msg.sources.length} transcript chunks)</span>
+                          <span>Grounded Sources ({msg.sources.length} transcript chunks • {citedCount} episodes)</span>
                         </div>
                         {isSourcesExpanded ? <CaretUp size={12} /> : <CaretDown size={12} />}
                       </button>
 
                       {isSourcesExpanded && (
-                        <div className="p-2.5 pt-0 space-y-1.5 border-t border-zinc-800/60">
+                        <div className="p-2.5 pt-0 space-y-2 border-t border-zinc-800/60">
                           {msg.sources.map((s, sIdx) => {
                             const similarityPct = Math.round((s.similarity || 0.8) * 100);
+                            const cleanEpisodeTitle = s.source_file.replace(/\.md$/, '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
                             return (
                               <div
                                 key={sIdx}
-                                className="p-2 rounded bg-zinc-950/70 border border-zinc-800 text-zinc-300 font-mono text-[10px]"
+                                className="p-2.5 rounded-lg bg-zinc-950/80 border border-zinc-800 text-zinc-300 font-mono text-[10px]"
                               >
-                                <div className="flex items-center justify-between font-semibold text-zinc-200 mb-1">
-                                  <span className="text-amber-300">Guest: {s.guest_name || 'Interviewee'}</span>
-                                  <span className="px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                <div className="flex items-center justify-between font-semibold text-zinc-200 mb-1 flex-wrap gap-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-amber-300 font-bold">Guest: {s.guest_name || 'Interviewee'}</span>
+                                    <span className="text-zinc-600">|</span>
+                                    <span className="text-zinc-400 font-sans font-medium text-[11px]">{cleanEpisodeTitle}</span>
+                                  </div>
+                                  <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-emerald-300 border border-zinc-700 font-mono text-[9px]">
                                     {similarityPct}% match
                                   </span>
                                 </div>
-                                <div className="text-zinc-400 line-clamp-2 text-[10px] font-sans">
+                                <div className="text-zinc-300 line-clamp-3 text-[11px] font-sans leading-relaxed pl-2 border-l-2 border-amber-500/40 my-1.5 italic bg-zinc-900/30 py-1 rounded-r">
                                   "{s.content}"
                                 </div>
-                                <div className="text-zinc-400 text-[9px] mt-1 truncate">
-                                  Source: {s.source_file}
+                                <div className="text-zinc-500 text-[9px] truncate">
+                                  File: {s.source_file} (Chunk {s.chunk_index || 1})
                                 </div>
                               </div>
                             );

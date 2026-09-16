@@ -172,9 +172,27 @@ If port 5432 or 8000 is occupied by a local service:
 
 ---
 
-## 8. Engineering Specifications & Deliverables
+## 8. Evaluator Ergonomics & Benchmark Testing
+
+The frontend provides an interactive empty-state canvas with 4 pre-configured trigger buttons designed to immediately test key evaluation criteria:
+
+| Benchmark Card | Evaluator Intent | Expected System Behavior |
+|---|---|---|
+| **Ask Grounded Growth Question** | RAG Grounding & Speaker Attribution | Retrieves Brian Chesky/Shreyas Doshi transcripts, outputs inline telemetry `[XX% Match \| N Episodes Cited]`, and provides expandable excerpts with exact guest quotes. |
+| **Ship 30 for 30 Essay Generator** | Viral Content Skill Execution | Switches mode to `ship30`, constructs a ~1,250-word essay with a punchy hook, 3-5 modular frameworks, a 48-hour checklist, and updates the persistent word count meter (`Target: ~1,250`). |
+| **Generate Interactive Canvas Artifact** | Sandboxed Execution | Emits an interactive HTML/JS calculator widget rendered inside an isolated `<iframe>` (`sandbox="allow-scripts"` without `allow-same-origin`) with DOMPurify sanitization. |
+| **Epistemic Guardrail Refusal** | Hallucination Prevention | Deterministically returns: `"The available podcast transcripts do not cover this specific question."` when cosine similarity is below `0.65`. |
+
+### Circuit Breaker & Timeout Recovery
+- If local Ollama inference exceeds 15.0 seconds, the backend intercepts the timeout and returns a structured `HTTP 504 Gateway Timeout`.
+- The frontend surfaces a non-blocking floating toast banner with an actionable **"Switch to Claude & Retry"** button, dynamically switching the provider to Anthropic Claude and re-dispatching the query with zero data loss.
+
+---
+
+## 9. Engineering Specifications & Deliverables
 
 - **Product Requirements**: [PRD.md](file:///c:/Users/avina/OneDrive/Desktop/lenny-growth-assistant/PRD.md)
 - **Technical Architecture**: [architecture.md](file:///c:/Users/avina/OneDrive/Desktop/lenny-growth-assistant/architecture.md)
 - **Design System & Aesthetics**: [design.md](file:///c:/Users/avina/OneDrive/Desktop/lenny-growth-assistant/design.md)
 - **Agent Trajectory Audit Logs**: [agent_transcripts/README.md](file:///c:/Users/avina/OneDrive/Desktop/lenny-growth-assistant/agent_transcripts/README.md)
+

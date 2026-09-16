@@ -173,6 +173,8 @@ def test_chat_dynamic_provider_ollama(client: TestClient):
 
         assert data["reply"] == mock_llm_reply
         assert data["provider_used"] == "ollama:llama3.2"
+        assert data["grounding_confidence"] > 0
+        assert data["epistemic_status"] in ["GROUNDED", "PARTIAL"]
         session_id = data["session_id"]
         assert session_id is not None
 
@@ -208,6 +210,8 @@ def test_chat_dynamic_provider_anthropic(client: TestClient):
 
         assert data["reply"] == mock_claude_reply
         assert data["provider_used"] == "anthropic:claude-3-5-sonnet-latest"
+        assert data["grounding_confidence"] > 0
+        assert data["epistemic_status"] in ["GROUNDED", "PARTIAL"]
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +223,9 @@ def test_chat_ollama_timeout_resilience(client: TestClient):
     with patch.object(
         LLMBridge,
         "generate",
-        side_effect=LLMTimeoutError("Ollama call timed out after 15 seconds."),
+        side_effect=LLMTimeoutError(
+            "Local Ollama model timed out (15s). Ensure Ollama is running, or toggle the model provider to 'Anthropic Claude' in the top bar."
+        ),
     ):
         payload = {
             "message": "Analyze our retention funnel.",
@@ -229,7 +235,8 @@ def test_chat_ollama_timeout_resilience(client: TestClient):
         assert response.status_code == status.HTTP_504_GATEWAY_TIMEOUT
         data = response.json()
         assert data["detail"]["error"] == "LLM_TIMEOUT"
-        assert "timed out after 15 seconds" in data["detail"]["message"]
+        assert "Local Ollama model timed out (15s)" in data["detail"]["message"]
+        assert "toggle the model provider to 'Anthropic Claude'" in data["detail"]["suggestion"]
         assert data["detail"]["provider"] == "ollama"
 
 

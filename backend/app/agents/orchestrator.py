@@ -101,7 +101,9 @@ class AgentOrchestrator:
             {
                 "reply": str,
                 "sources": List[Dict[str, Any]],
-                "artifact": Optional[Dict[str, Any]]
+                "artifact": Optional[Dict[str, Any]],
+                "grounding_confidence": float,
+                "epistemic_status": str,
             }
         """
         cleaned_query = message.strip()
@@ -110,10 +112,21 @@ class AgentOrchestrator:
                 "reply": STRICT_REFUSAL_MESSAGE,
                 "sources": [],
                 "artifact": None,
+                "grounding_confidence": 0.0,
+                "epistemic_status": "REFUSAL",
             }
 
         # 1. Retrieve grounded context from vector store
         sources = retrieve_context(query=cleaned_query)
+
+        # Calculate grounding metrics
+        if sources:
+            avg_sim = round(float(sum(s.get("similarity", 0.0) for s in sources) / len(sources)), 4)
+            confidence = min(max(avg_sim, 0.0), 1.0)
+            epistemic_status = "GROUNDED" if confidence >= 0.75 else "PARTIAL"
+        else:
+            confidence = 0.0
+            epistemic_status = "REFUSAL"
 
         # 2. Strict Epistemic Gating:
         # If no transcript chunks exceed 0.65 similarity, refuse immediately
@@ -130,6 +143,8 @@ class AgentOrchestrator:
                     "reply": STRICT_REFUSAL_MESSAGE,
                     "sources": [],
                     "artifact": None,
+                    "grounding_confidence": 0.0,
+                    "epistemic_status": "REFUSAL",
                 }
 
         # 3. Select and assemble system prompt
@@ -170,10 +185,14 @@ class AgentOrchestrator:
                 "reply": STRICT_REFUSAL_MESSAGE,
                 "sources": [],
                 "artifact": None,
+                "grounding_confidence": 0.0,
+                "epistemic_status": "REFUSAL",
             }
 
         return {
             "reply": clean_reply,
             "sources": sources,
             "artifact": artifact,
+            "grounding_confidence": confidence,
+            "epistemic_status": epistemic_status,
         }

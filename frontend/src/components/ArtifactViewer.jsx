@@ -11,7 +11,8 @@ import {
   X, 
   FileHtml, 
   FileText,
-  Sparkle
+  Sparkle,
+  Clock
 } from '@phosphor-icons/react';
 
 export default function ArtifactViewer({
@@ -21,6 +22,17 @@ export default function ArtifactViewer({
 }) {
   const [activeTab, setActiveTab] = useState('preview'); // 'preview' | 'code'
   const [copied, setCopied] = useState(false);
+
+  // Calculate word count for Ship 30 telemetry
+  const wordCount = useMemo(() => {
+    if (!artifact?.content) return 0;
+    return artifact.content.trim().split(/\s+/).filter(Boolean).length;
+  }, [artifact]);
+
+  // Reading time at average 225 words per minute
+  const readingTimeMin = useMemo(() => {
+    return Math.max(1, Math.ceil(wordCount / 225));
+  }, [wordCount]);
 
   // Sanitize HTML defensively with DOMPurify and inject clean CSS reset
   const sanitizedHtml = useMemo(() => {
@@ -76,6 +88,58 @@ export default function ArtifactViewer({
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportHtml = () => {
+    const rawMarkdown = artifact?.content || '';
+    const htmlDoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${artifact.title || 'Ship 30 for 30 Essay'}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', -apple-system, sans-serif; max-width: 720px; margin: 2.5rem auto; padding: 0 1.5rem; line-height: 1.7; color: #18181b; background: #fafafa; }
+    h1, h2, h3 { color: #09090b; margin-top: 1.75rem; margin-bottom: 0.5rem; font-weight: 700; }
+    h1 { font-size: 2rem; border-bottom: 1px solid #e4e4e7; padding-bottom: 0.5rem; }
+    p { margin-bottom: 1.25rem; font-size: 1.05rem; }
+    blockquote { border-left: 3px solid #d97706; padding-left: 1rem; margin: 1.5rem 0; color: #71717a; font-style: italic; }
+    ul, ol { margin-bottom: 1.25rem; padding-left: 1.5rem; }
+    li { margin-bottom: 0.4rem; }
+    code { font-family: 'JetBrains Mono', monospace; background: #f4f4f5; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.875rem; }
+    .meta-bar { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #71717a; border-bottom: 1px solid #e4e4e7; padding-bottom: 0.75rem; margin-bottom: 1.5rem; }
+  </style>
+</head>
+<body>
+  <div class="meta-bar">The Lenny Growth Assistant • Ship 30 for 30 • ${wordCount.toLocaleString()} words • ${readingTimeMin} min read</div>
+  <h1>${artifact.title || 'Ship 30 for 30 Essay'}</h1>
+  <div>
+    ${DOMPurify.sanitize(
+      rawMarkdown
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
+        .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
+        .replace(/\*(.*)\*/gim, '<i>$1</i>')
+        .replace(/\n\n/gim, '</p><p>')
+        .replace(/\n/gim, '<br />')
+    )}
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlDoc], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(artifact.title || 'ship30-essay').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -158,6 +222,61 @@ export default function ArtifactViewer({
           </button>
         </div>
       </div>
+
+      {/* Ship 30 for 30 Persistent Telemetry Bar */}
+      {!isHtml && (
+        <div className="bg-zinc-900/90 border-b border-zinc-800 px-4 py-2 flex items-center justify-between gap-3 text-xs flex-wrap">
+          <div className="flex items-center gap-2.5 font-mono text-[11px]">
+            {/* Word Count Badge */}
+            <div
+              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border ${
+                wordCount >= 1100 && wordCount <= 1400
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+              }`}
+            >
+              <span className="font-semibold">{wordCount.toLocaleString()} words</span>
+              <span className="text-zinc-500">/</span>
+              <span className="text-zinc-400">Target: ~1,250</span>
+            </div>
+
+            {/* Readability / Est. Reading Time */}
+            <div className="flex items-center gap-1 text-zinc-400 px-2 py-0.5 rounded bg-zinc-950 border border-zinc-800">
+              <Clock size={12} className="text-amber-400" />
+              <span>{readingTimeMin} min read</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Copy Markdown Button */}
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition-colors"
+            >
+              {copied ? (
+                <>
+                  <Check size={13} className="text-emerald-400" />
+                  <span className="text-emerald-400 font-mono text-[11px]">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy size={13} />
+                  <span className="text-[11px]">Copy Markdown</span>
+                </>
+              )}
+            </button>
+
+            {/* Export HTML Button */}
+            <button
+              onClick={handleExportHtml}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-medium transition-colors"
+            >
+              <DownloadSimple size={13} />
+              <span className="text-[11px]">Export HTML</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Canvas Body */}
       <div className="flex-1 overflow-hidden relative bg-zinc-950">

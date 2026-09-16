@@ -145,6 +145,8 @@ def test_e2e_rag_question_answering_pipeline(client: TestClient):
         assert data["sources"][0]["guest_name"] == "Brian Chesky"
         assert data["sources"][0]["source_file"] == "brian-chesky-airbnb.md"
         assert data["sources"][0]["similarity"] == 0.895
+        assert data["grounding_confidence"] == 0.895
+        assert data["epistemic_status"] == "GROUNDED"
 
         # Check persistence in database
         session_id = data["session_id"]
@@ -173,6 +175,8 @@ def test_e2e_non_grounded_query_refusal(client: TestClient):
         assert data["reply"] == STRICT_REFUSAL_MESSAGE
         assert data["sources"] == []
         assert data["artifact"] is None
+        assert data["grounding_confidence"] == 0.0
+        assert data["epistemic_status"] == "REFUSAL"
 
 
 def test_e2e_ship30_essay_generation_format(client: TestClient):
@@ -216,6 +220,8 @@ def test_e2e_ship30_essay_generation_format(client: TestClient):
         assert "The High-Agency Operating Model" in data["reply"]
         assert len(data["sources"]) == 1
         assert data["sources"][0]["guest_name"] == "Shreyas Doshi"
+        assert data["grounding_confidence"] == 0.92
+        assert data["epistemic_status"] == "GROUNDED"
 
 
 def test_e2e_artifact_emission_pipeline(client: TestClient):

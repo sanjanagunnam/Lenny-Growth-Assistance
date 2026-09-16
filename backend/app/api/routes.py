@@ -249,7 +249,7 @@ async def chat_completion(
                 "error": "LLM_TIMEOUT",
                 "message": str(err),
                 "provider": provider,
-                "suggestion": "The local Ollama model timed out after 15s. Try switching provider to 'anthropic' or retry.",
+                "suggestion": "Local Ollama model timed out (15s). Ensure Ollama is running, or toggle the model provider to 'Anthropic Claude' in the top bar.",
             },
         )
     except LLMUnavailableError as err:
@@ -338,4 +338,6 @@ async def chat_completion(
         sources=source_items,
         artifact=artifact_payload,
         provider_used=provider_descriptor,
+        grounding_confidence=agent_result.get("grounding_confidence", 0.0),
+        epistemic_status=agent_result.get("epistemic_status", "REFUSAL"),
     )

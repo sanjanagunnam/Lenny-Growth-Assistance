@@ -67,6 +67,14 @@ class ChatResponse(BaseModel):
     sources: List[SourceItem] = Field(default_factory=list)
     artifact: Optional[ArtifactPayload] = None
     provider_used: str
+    grounding_confidence: float = Field(
+        default=0.0,
+        description="Average cosine similarity score of retrieved chunks (0.0 to 1.0)",
+    )
+    epistemic_status: Literal["GROUNDED", "PARTIAL", "REFUSAL"] = Field(
+        default="REFUSAL",
+        description="Epistemic verification status based on retrieved transcript evidence",
+    )
 
 
 # ---------------------------------------------------------------------------

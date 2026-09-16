@@ -170,3 +170,52 @@ flowchart LR
    - **NO `allow-same-origin`**: The iframe runs with an opaque origin (`null`), strictly preventing access to parent cookies, local storage, session storage, or the parent document DOM.
    - **NO `allow-top-navigation`**: The sandboxed content cannot redirect or hijack the parent window.
    - **Clean CSS Reset**: The iframe receives an isolated CSS stylesheet, preventing styling leaks or CSS injection into the main application.
+
+---
+
+## 6. Grounding Confidence & Epistemic Status Engine
+
+To ensure transparent evidence verification, every chat response computes real-time grounding metrics:
+
+- **Mathematical Calculation**:
+  $$\text{Confidence Score} = \frac{1}{N} \sum_{i=1}^N \cos(\vec{q}, \vec{c}_i)$$
+  where $\vec{q}$ is the query embedding and $\vec{c}_i$ is the $i$-th retrieved transcript chunk ($N \ge 1$, $\cos \ge 0.65$).
+- **Status Classification**:
+  - `GROUNDED`: Average cosine similarity $\ge 0.75$. Indicates high-fidelity alignment with podcast source material.
+  - `PARTIAL`: $0.65 \le \text{similarity} < 0.75$. Retains strict answers with contextual hedging.
+  - `REFUSAL`: No chunks meet the 0.65 threshold. Triggers immediate deterministic refusal without calling the generation model.
+- **Frontend Telemetry Delivery**:
+  - Assistant replies feature an inline badge `[XX% Match | N Episodes Cited]`.
+  - Expandable citation drawer displays guest name, episode title, match percentage, and exact verbatim excerpt.
+
+---
+
+## 7. Circuit Breaker & Timeout Resilience
+
+Local LLM runtimes are susceptible to cold-start stalls, GPU queue starvation, or daemon failures. The system implements a proactive circuit breaker:
+
+```mermaid
+sequenceDiagram
+    participant Frontend as Browser Client
+    participant Backend as FastAPI Backend
+    participant Ollama as Local Ollama Daemon
+    participant Claude as Anthropic Claude API
+
+    Frontend->>Backend: POST /api/v1/chat (provider: "ollama")
+    Backend->>Ollama: POST /api/generate (15.0s timeout)
+    Note over Backend,Ollama: Local inference stalls (>15s)
+    Ollama--xBackend: httpx.TimeoutException
+    Backend-->>Frontend: HTTP 504 Gateway Timeout {"error": "LLM_TIMEOUT", ...}
+    Note over Frontend: Circuit Breaker Toast activates
+    Frontend->>Frontend: Evaluator clicks "Switch to Claude & Retry"
+    Frontend->>Backend: POST /api/v1/chat (provider: "anthropic")
+    Backend->>Claude: messages.create()
+    Claude-->>Backend: Grounded Response + Artifact
+    Backend-->>Frontend: 200 OK + ChatResponse
+```
+
+1. **Backend Interception**: The `LLMBridge` enforces an explicit 15.0-second timeout on local daemon calls, catching `httpx.TimeoutException` and raising `LLMTimeoutError`.
+2. **Structured Error Contract**: Returns HTTP 504 with an actionable message:
+   `"Local Ollama model timed out (15s). Ensure Ollama is running, or toggle the model provider to 'Anthropic Claude' in the top bar."`
+3. **Non-Blocking Client Recovery**: The frontend intercepts 504 responses, suppresses disruptive crashes, displays a floating toast banner, and provides a one-click **"Switch to Claude & Retry"** button that dynamically switches the runtime provider and dispatches the request.
+

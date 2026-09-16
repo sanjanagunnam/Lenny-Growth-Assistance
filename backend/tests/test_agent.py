@@ -34,6 +34,8 @@ def test_strict_refusal_when_no_chunks_retrieved():
             assert result["reply"] == STRICT_REFUSAL_MESSAGE
             assert result["sources"] == []
             assert result["artifact"] is None
+            assert result["grounding_confidence"] == 0.0
+            assert result["epistemic_status"] == "REFUSAL"
 
     asyncio.run(_test())
 
@@ -51,6 +53,8 @@ def test_strict_refusal_on_off_topic_query():
             assert result["reply"] == STRICT_REFUSAL_MESSAGE
             assert result["sources"] == []
             assert result["artifact"] is None
+            assert result["grounding_confidence"] == 0.0
+            assert result["epistemic_status"] == "REFUSAL"
 
     asyncio.run(_test())
 
@@ -90,6 +94,8 @@ def test_grounded_response_with_sources():
             assert result["sources"][0]["guest_name"] == "Brian Chesky"
             assert result["sources"][0]["similarity"] == 0.88
             assert result["artifact"] is None
+            assert result["grounding_confidence"] == 0.88
+            assert result["epistemic_status"] == "GROUNDED"
 
             call_args = mock_generate.call_args
             prompt_passed = call_args.kwargs["prompt"]
