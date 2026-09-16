@@ -37,7 +37,7 @@ class ChatRequest(BaseModel):
         None,
         description="Existing session UUID, or omitted to automatically spawn a session",
     )
-    provider: Literal["ollama", "anthropic"] = Field(
+    provider: Literal["ollama", "anthropic", "gemini", "groq", "openai"] = Field(
         "ollama",
         description="Selected LLM provider for runtime dynamic dispatch",
     )
@@ -71,7 +71,7 @@ class ChatResponse(BaseModel):
         default=0.0,
         description="Average cosine similarity score of retrieved chunks (0.0 to 1.0)",
     )
-    epistemic_status: Literal["GROUNDED", "PARTIAL", "REFUSAL"] = Field(
+    epistemic_status: Literal["GROUNDED", "PARTIAL", "REFUSAL", "GENERAL"] = Field(
         default="REFUSAL",
         description="Epistemic verification status based on retrieved transcript evidence",
     )

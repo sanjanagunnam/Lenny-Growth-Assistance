@@ -52,7 +52,165 @@ http://localhost:3000
 
 ---
 
-## 4. Transcript Ingestion Pipeline
+## 4. Local Development (Bare-Metal — No Docker Required)
+
+Run the backend, frontend, and API locally without Docker. This is the fastest way to iterate during development.
+
+### Prerequisites
+
+Make sure you have the following installed:
+
+- **Python 3.10+** — [python.org](https://python.org)
+- **Node.js 18+** — [nodejs.org](https://nodejs.org)
+- **pip** (comes with Python)
+- **Ollama** *(optional, for local LLM)* — [ollama.com](https://ollama.com)
+
+---
+
+### Step 1 — Install Backend Dependencies
+
+```bash
+# From the project root
+pip install -r backend/requirements.txt
+```
+
+---
+
+### Step 2 — Configure Environment
+
+```bash
+# Copy the env template (if not done already)
+cp .env.example .env
+```
+
+The default `.env` is pre-configured for **SQLite** (no PostgreSQL needed) and **Groq** (free cloud LLM, no Ollama required). Just add your keys:
+
+| Variable | Required | Where to get it |
+|---|---|---|
+| `GROQ_API_KEY` | ✅ For Groq (default) | [console.groq.com](https://console.groq.com) |
+| `ANTHROPIC_API_KEY` | Optional | [console.anthropic.com](https://console.anthropic.com) |
+| `OLLAMA_BASE_URL` | Optional (local) | Set to `http://localhost:11434` |
+
+---
+
+### Step 3 — Run the Backend API Server
+
+```bash
+# From the project root directory
+python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+The API is now live at:
+- **API Base**: `http://localhost:8000`
+- **Swagger Docs**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
+- **Health Check**: `http://localhost:8000/healthz`
+
+---
+
+### Step 4 — Run the Frontend Dev Server
+
+```bash
+# In a new terminal, from the frontend/ directory
+cd frontend
+npm install        # First time only
+npm run dev
+```
+
+The React app is now available at:
+- **Local**: `http://localhost:5173`
+
+---
+
+### Step 5 — Test the API (Quick Smoke Test)
+
+Once both servers are running, verify everything works:
+
+```bash
+# 1. Health check
+curl http://localhost:8000/healthz
+
+# 2. Send a chat message using Groq (default, free)
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "What does Lenny say about product-market fit?",
+    "provider": "groq",
+    "mode": "chat"
+  }'
+
+# 3. Chat using Anthropic Claude
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Write a Ship 30 essay on the Lenny framework.",
+    "provider": "anthropic",
+    "mode": "ship30"
+  }'
+
+# 4. Chat using local Ollama (requires Ollama running locally)
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "What are Airbnb growth loops?",
+    "provider": "ollama",
+    "mode": "chat"
+  }'
+
+# 5. List all sessions
+curl http://localhost:8000/api/v1/sessions
+
+# 6. Create a new session
+curl -X POST http://localhost:8000/api/v1/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"title": "My Growth Session"}'
+```
+
+---
+
+### API Summary Table
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/` | GET | Service metadata & version |
+| `/healthz` | GET | Database + provider health check |
+| `/docs` | GET | Swagger interactive API docs |
+| `/api/v1/chat` | POST | Send a message (supports `provider`, `mode`, `session_id`) |
+| `/api/v1/sessions` | GET | List all chat sessions |
+| `/api/v1/sessions` | POST | Create a new session |
+| `/api/v1/sessions/{id}` | GET | Get session details |
+| `/api/v1/sessions/{id}/messages` | GET | Retrieve all messages in a session |
+
+---
+
+### Chat Request Body Reference
+
+```json
+{
+  "message": "Your question here",
+  "provider": "groq",        // "groq" | "anthropic" | "ollama"
+  "mode": "chat",            // "chat" | "ship30"
+  "session_id": null         // optional UUID to continue a conversation
+}
+```
+
+---
+
+### Running with Ollama (100% Local, Offline)
+
+```bash
+# Install and start Ollama (run once)
+ollama pull nomic-embed-text
+ollama pull llama3.2        # or glm-5.3-flash (faster, smaller)
+
+# Then set in .env:
+# DEFAULT_PROVIDER=ollama
+# OLLAMA_DEFAULT_MODEL=llama3.2
+```
+
+---
+
+## 5. Transcript Ingestion Pipeline
 
 To populate the vector database with Lenny's Podcast transcripts:
 
@@ -68,7 +226,7 @@ python -m backend.app.rag.ingest --dry-run
 
 ---
 
-## 5. Model Selection & Runtime Controls
+## 6. Model Selection & Runtime Controls
 
 You can switch models at runtime directly from the **UI Top Bar** or via API request body:
 
@@ -99,7 +257,7 @@ curl -X POST http://localhost:8000/api/v1/chat \
 
 ---
 
-## 6. Automated Test Suites
+## 7. Automated Test Suites
 
 The project features a comprehensive 34-test automated regression suite covering unit, integration, and end-to-end flows:
 
@@ -121,7 +279,7 @@ docker compose exec backend pytest -v
 
 ---
 
-## 7. Diagnostics & Troubleshooting Guide
+## 8. Diagnostics & Troubleshooting Guide
 
 ### 1. Check Subsystem Health (`/healthz`)
 Verify the health of the database and Ollama daemon:
@@ -172,7 +330,7 @@ If port 5432 or 8000 is occupied by a local service:
 
 ---
 
-## 8. Evaluator Ergonomics & Benchmark Testing
+## 9. Evaluator Ergonomics & Benchmark Testing
 
 The frontend provides an interactive empty-state canvas with 4 pre-configured trigger buttons designed to immediately test key evaluation criteria:
 
@@ -189,7 +347,7 @@ The frontend provides an interactive empty-state canvas with 4 pre-configured tr
 
 ---
 
-## 9. Engineering Specifications & Deliverables
+## 10. Engineering Specifications & Deliverables
 
 - **Product Requirements**: [PRD.md](file:///c:/Users/avina/OneDrive/Desktop/lenny-growth-assistant/PRD.md)
 - **Technical Architecture**: [architecture.md](file:///c:/Users/avina/OneDrive/Desktop/lenny-growth-assistant/architecture.md)

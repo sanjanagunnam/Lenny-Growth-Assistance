@@ -1,0 +1,31 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Data (mounted as volume at runtime — not baked into image)
+data/
+lenny_growth_local.db
+
+# Frontend (built separately)
+frontend/node_modules/
+frontend/dist/
+
+# Dev/IDE
+.env
+.env.*
+.git/
+.gitignore
+.vscode/
+*.md
+agent_transcripts/
+
+# Docker
+docker-compose*.yml

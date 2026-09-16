@@ -280,14 +280,14 @@ def test_chat_anthropic_missing_key_resilience(client: TestClient):
 # ---------------------------------------------------------------------------
 
 def test_chat_empty_prompt_blocked(client: TestClient):
-    """Verify empty or whitespace-only messages are blocked with 422 Unprocessable Entity."""
+    """Verify empty or whitespace-only messages are blocked with 422 Unprocessable Content."""
     # Empty string
     resp1 = client.post("/api/v1/chat", json={"message": "", "provider": "ollama"})
-    assert resp1.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert resp1.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     # Whitespace only
     resp2 = client.post("/api/v1/chat", json={"message": "    \n   ", "provider": "ollama"})
-    assert resp2.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert resp2.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 def test_chat_invalid_provider_rejected(client: TestClient):
@@ -296,4 +296,4 @@ def test_chat_invalid_provider_rejected(client: TestClient):
         "/api/v1/chat",
         json={"message": "Hello", "provider": "unknown_ai_provider"},
     )
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT

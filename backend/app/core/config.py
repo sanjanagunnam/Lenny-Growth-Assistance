@@ -33,7 +33,7 @@ class Settings(BaseSettings):
         description="Embedding model for Ollama",
     )
     OLLAMA_TIMEOUT_SECONDS: float = Field(
-        default=300.0,
+        default=120.0,
         description="Timeout in seconds for Ollama API requests",
     )
 
@@ -42,15 +42,49 @@ class Settings(BaseSettings):
         default=None,
         description="API key for Anthropic Claude",
     )
+    ANTHROPIC_WORKSPACE_ID: Optional[str] = Field(
+        default=None,
+        description="Workspace ID for org-level Anthropic API keys",
+    )
     ANTHROPIC_DEFAULT_MODEL: str = Field(
-        default="claude-3-5-sonnet-latest",
+        default="claude-sonnet-5-latest",
         description="Default model for Anthropic generation",
+    )
+
+    # Google Gemini settings
+    GEMINI_API_KEY: Optional[str] = Field(
+        default=None,
+        description="API key for Google Gemini",
+    )
+    GEMINI_DEFAULT_MODEL: str = Field(
+        default="gemini-flash-latest",
+        description="Default model for Google Gemini",
+    )
+
+    # Groq settings (Ultra-fast 500 tokens/sec)
+    GROQ_API_KEY: Optional[str] = Field(
+        default=None,
+        description="API key for Groq Cloud",
+    )
+    GROQ_DEFAULT_MODEL: str = Field(
+        default="openai/gpt-oss-120b",
+        description="Default model for Groq",
+    )
+
+    # OpenAI settings
+    OPENAI_API_KEY: Optional[str] = Field(
+        default=None,
+        description="API key for OpenAI",
+    )
+    OPENAI_DEFAULT_MODEL: str = Field(
+        default="gpt-4o-mini",
+        description="Default model for OpenAI",
     )
 
     # General LLM defaults
     DEFAULT_PROVIDER: str = Field(
         default="ollama",
-        description="Default LLM provider: 'ollama' or 'anthropic'",
+        description="Default LLM provider: 'ollama', 'gemini', 'groq', 'openai', or 'anthropic'",
     )
 
     # RAG Retrieval parameters

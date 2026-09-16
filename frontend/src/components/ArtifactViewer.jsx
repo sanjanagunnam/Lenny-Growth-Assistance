@@ -68,7 +68,41 @@ export default function ArtifactViewer({
     `;
   }, [artifact]);
 
-  if (!isOpen || !artifact) return null;
+  if (!isOpen) return null;
+
+  // Empty state when canvas is open but no artifact loaded
+  if (!artifact) {
+    return (
+      <div className="flex-1 lg:w-1/2 h-full bg-zinc-950 border-l border-zinc-800 flex flex-col z-20 shadow-2xl transition-all">
+        <div className="h-12 border-b border-zinc-800 px-4 flex items-center justify-between bg-zinc-900/70">
+          <div className="flex items-center gap-2.5">
+            <div className="w-5 h-5 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 flex-shrink-0">
+              <Sparkle size={12} weight="fill" />
+            </div>
+            <h3 className="text-xs font-semibold text-zinc-100">Growth Canvas</h3>
+          </div>
+          <button
+            onClick={onClose}
+            title="Close Canvas"
+            className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-rose-400 transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
+          <div className="w-14 h-14 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <Sparkle size={28} weight="fill" />
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-zinc-200 mb-1">No Artifact Yet</h4>
+            <p className="text-xs text-zinc-500 max-w-xs leading-relaxed">
+              Ask a question in Ship 30 mode or request a code artifact, checklist, or template — it will appear here for preview and export.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleCopy = async () => {
     try {

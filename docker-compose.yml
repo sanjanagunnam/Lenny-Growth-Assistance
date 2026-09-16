@@ -44,6 +44,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DEFAULT_PROVIDER: ${DEFAULT_PROVIDER:-ollama}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/app/data:ro
     depends_on:
       db:
         condition: service_healthy

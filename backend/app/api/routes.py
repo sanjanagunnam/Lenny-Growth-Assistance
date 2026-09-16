@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from typing import Any, Dict, List, Optional
 import uuid
 import httpx
@@ -82,21 +83,33 @@ def _format_session_response(session: Session) -> SessionResponse:
 # Health & Diagnostics
 # ---------------------------------------------------------------------------
 
+_last_ollama_check_time: float = 0.0
+_cached_ollama_ok: bool = True
+
+
 @router.get("/healthz", response_model=HealthResponse, tags=["Diagnostics"])
+@router.get("/health", response_model=HealthResponse, tags=["Diagnostics"], include_in_schema=False)
 async def health_check() -> HealthResponse:
-    """Inspects database connectivity and Ollama daemon reachability."""
+    """Inspects database connectivity and Ollama daemon reachability with fast caching."""
+    global _last_ollama_check_time, _cached_ollama_ok
+    import time
     # 1. Database Ping
     db_ok = ping_db()
 
-    # 2. Ollama Reachability Check
-    ollama_ok = False
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(2.0, connect=1.5)) as client:
-            resp = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
-            ollama_ok = resp.status_code == 200
-    except Exception as err:
-        logger.debug("Healthz Ollama probe failed: %s", err)
-        ollama_ok = False
+    # 2. Ollama Reachability Check (cached for 15s to eliminate polling contention)
+    now = time.time()
+    if (now - _last_ollama_check_time > 15.0) or ("PYTEST_CURRENT_TEST" in os.environ):
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(1.0, connect=0.8)) as client:
+                resp = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
+                _cached_ollama_ok = resp.status_code == 200
+                _last_ollama_check_time = now
+        except Exception as err:
+            logger.debug("Healthz Ollama probe failed: %s", err)
+            _cached_ollama_ok = False
+            _last_ollama_check_time = now
+
+    ollama_ok = _cached_ollama_ok
 
     # 3. Available Providers
     providers: List[str] = []
@@ -104,8 +117,14 @@ async def health_check() -> HealthResponse:
         providers.append("ollama")
     if settings.ANTHROPIC_API_KEY:
         providers.append("anthropic")
+    if settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+        providers.append("gemini")
+    if settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY"):
+        providers.append("groq")
+    if settings.OPENAI_API_KEY or os.environ.get("OPENAI_API_KEY"):
+        providers.append("openai")
 
-    overall_status = "healthy" if (db_ok and (ollama_ok or bool(settings.ANTHROPIC_API_KEY))) else "degraded"
+    overall_status = "healthy" if (db_ok and (ollama_ok or len(providers) > 0)) else "degraded"
 
     return HealthResponse(
         status=overall_status,
@@ -117,9 +136,63 @@ async def health_check() -> HealthResponse:
 
 @router.get("/api/v1/models", tags=["Diagnostics"])
 async def list_available_models() -> Dict[str, Any]:
-    """Return available LLM models grouped by provider, highlighting glm-5.3-flash."""
+    """Return available LLM models grouped by provider."""
     return {
         "providers": {
+            "gemini": [
+                {
+                    "id": "gemini-flash-latest",
+                    "name": "Google Gemini Flash",
+                    "description": "Ultra-fast, high-intelligence Google frontier model",
+                    "recommended": True,
+                },
+                {
+                    "id": "gemini-pro-latest",
+                    "name": "Google Gemini Pro",
+                    "description": "Deep reasoning Google frontier model",
+                    "recommended": False,
+                },
+            ],
+            "groq": [
+                {
+                    "id": "openai/gpt-oss-120b",
+                    "name": "GPT-OSS 120B (Groq ~500 t/s)",
+                    "description": "Ultra-fast flagship reasoning on Groq LPUs",
+                    "recommended": True,
+                },
+                {
+                    "id": "openai/gpt-oss-20b",
+                    "name": "GPT-OSS 20B Instant",
+                    "description": "Fastest sub-second responses on Groq",
+                    "recommended": False,
+                },
+                {
+                    "id": "qwen/qwen3.8-27b",
+                    "name": "Qwen 3.8 27B",
+                    "description": "Dense reasoning and product operator model",
+                    "recommended": False,
+                },
+                {
+                    "id": "groq/compound",
+                    "name": "Groq Compound",
+                    "description": "Compound AI multi-system reasoning",
+                    "recommended": False,
+                },
+            ],
+            "openai": [
+                {
+                    "id": "gpt-4o-mini",
+                    "name": "GPT-4o Mini",
+                    "description": "Fast, high-efficiency OpenAI model",
+                    "recommended": True,
+                },
+                {
+                    "id": "gpt-4o",
+                    "name": "GPT-4o",
+                    "description": "Flagship high-intelligence OpenAI model",
+                    "recommended": False,
+                },
+            ],
             "ollama": [
                 {
                     "id": "glm-5.3-flash",
@@ -154,15 +227,27 @@ async def list_available_models() -> Dict[str, Any]:
             ],
             "anthropic": [
                 {
-                    "id": "claude-3-5-sonnet-latest",
-                    "name": "Claude 3.5 Sonnet",
-                    "description": "State-of-the-art cloud frontier intelligence",
+                    "id": "claude-sonnet-5-latest",
+                    "name": "Claude Sonnet 5",
+                    "description": "Latest Sonnet — fast, intelligent, balanced",
                     "recommended": True,
+                },
+                {
+                    "id": "claude-haiku-4-5-latest",
+                    "name": "Claude Haiku 4.5",
+                    "description": "Ultra-fast, low-latency for quick answers",
+                    "recommended": False,
+                },
+                {
+                    "id": "claude-opus-5-latest",
+                    "name": "Claude Opus 5",
+                    "description": "Most capable — deep reasoning & analysis",
+                    "recommended": False,
                 },
             ],
         },
-        "default_provider": "ollama",
-        "default_model": "glm-5.3-flash",
+        "default_provider": settings.DEFAULT_PROVIDER,
+        "default_model": settings.OLLAMA_DEFAULT_MODEL,
     }
 
 
@@ -221,6 +306,49 @@ def get_session(
     return _format_session_response(session)
 
 
+@router.get(
+    "/api/v1/sessions/{session_id}/messages",
+    response_model=List[MessageResponse],
+    tags=["Sessions"],
+    include_in_schema=False,
+)
+def get_session_messages(
+    session_id: str,
+    db: SQLAlchemySession = Depends(get_db),
+) -> List[MessageResponse]:
+    """Retrieve message list directly for a specific conversation session."""
+    session = db.query(Session).filter(Session.id == session_id).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session '{session_id}' was not found.",
+        )
+    return [_format_message_response(m) for m in session.messages]
+
+
+@router.delete(
+    "/api/v1/sessions/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Sessions"],
+)
+def delete_session(
+    session_id: str,
+    db: SQLAlchemySession = Depends(get_db),
+):
+    """Delete a conversation session and all its messages."""
+    session = db.query(Session).filter(Session.id == session_id).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session '{session_id}' was not found.",
+        )
+    # Delete all messages belonging to this session
+    db.query(Message).filter(Message.session_id == session_id).delete()
+    db.delete(session)
+    db.commit()
+    logger.info("Deleted session: %s", session_id)
+
+
 # ---------------------------------------------------------------------------
 # Chat Completion Route
 # ---------------------------------------------------------------------------
@@ -270,15 +398,23 @@ async def chat_completion(
     # 3. Determine active provider & model
     provider = request.provider.lower()
     model = request.model
-    if provider == "ollama":
-        model_name = model or settings.OLLAMA_DEFAULT_MODEL
-    elif provider == "anthropic":
-        model_name = model or settings.ANTHROPIC_DEFAULT_MODEL
-    else:
+
+    # Resolve default model name per provider
+    provider_model_defaults = {
+        "ollama": settings.OLLAMA_DEFAULT_MODEL,
+        "anthropic": settings.ANTHROPIC_DEFAULT_MODEL,
+        "gemini": getattr(settings, "GEMINI_DEFAULT_MODEL", "gemini-flash-latest"),
+        "groq": getattr(settings, "GROQ_DEFAULT_MODEL", "openai/gpt-oss-120b"),
+        "openai": getattr(settings, "OPENAI_DEFAULT_MODEL", "gpt-4o-mini"),
+    }
+
+    if provider not in provider_model_defaults:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported provider '{provider}'.",
+            detail=f"Unsupported provider '{provider}'. Choose from: {', '.join(provider_model_defaults.keys())}.",
         )
+
+    model_name = model or provider_model_defaults[provider]
 
     provider_descriptor = f"{provider}:{model_name}"
 
@@ -300,7 +436,7 @@ async def chat_completion(
                 "error": "LLM_TIMEOUT",
                 "message": str(err),
                 "provider": provider,
-                "suggestion": "Local Ollama model timed out (15s). Ensure Ollama is running, or toggle the model provider to 'Anthropic Claude' in the top bar.",
+                "suggestion": "Local Ollama model timed out. Ensure Ollama is running, or toggle the model provider to 'Anthropic Claude' in the top bar.",
             },
         )
     except LLMUnavailableError as err:

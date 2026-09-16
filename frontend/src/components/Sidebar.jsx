@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Plus, 
   ChatTeardropText, 
@@ -11,10 +11,15 @@ export default function Sidebar({
   isOpen,
   sessions,
   activeSessionId,
+  generatingSessions = {},
   onSelectSession,
   onNewSession,
+  onDeleteSession,
   onCloseMobile,
 }) {
+  const [hoveredId, setHoveredId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
   const formatTime = (isoString) => {
     if (!isoString) return '';
     try {
@@ -32,6 +37,19 @@ export default function Sidebar({
       return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     } catch {
       return '';
+    }
+  };
+
+  const handleDeleteClick = (e, sessionId) => {
+    e.stopPropagation();
+    if (confirmDeleteId === sessionId) {
+      // Second click = confirm delete
+      onDeleteSession(sessionId);
+      setConfirmDeleteId(null);
+    } else {
+      setConfirmDeleteId(sessionId);
+      // Auto-reset confirm state after 3s
+      setTimeout(() => setConfirmDeleteId(null), 3000);
     }
   };
 
@@ -81,42 +99,81 @@ export default function Sidebar({
           ) : (
             sessions.map((sess) => {
               const isActive = sess.id === activeSessionId;
+              const isHovered = hoveredId === sess.id;
+              const isConfirmDelete = confirmDeleteId === sess.id;
               return (
-                <button
+                <div
                   key={sess.id}
-                  onClick={() => {
-                    onSelectSession(sess.id);
-                    if (onCloseMobile) onCloseMobile();
+                  onMouseEnter={() => setHoveredId(sess.id)}
+                  onMouseLeave={() => {
+                    setHoveredId(null);
+                    if (confirmDeleteId === sess.id) setConfirmDeleteId(null);
                   }}
-                  className={`w-full text-left p-2.5 rounded-lg text-xs transition-all group relative flex items-start justify-between gap-2 ${
-                    isActive
-                      ? 'bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'
-                      : 'text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200'
-                  }`}
+                  className="relative"
                 >
-                  <div className="flex items-start gap-2 min-w-0 flex-1">
-                    <ChatTeardropText
-                      size={14}
-                      className={`mt-0.5 flex-shrink-0 ${
-                        isActive ? 'text-amber-400' : 'text-zinc-400 group-hover:text-zinc-400'
-                      }`}
-                      weight={isActive ? 'fill' : 'regular'}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-zinc-200 leading-tight">
-                        {sess.title || 'Untitled Session'}
-                      </p>
-                      <span className="text-[10px] font-mono text-zinc-400 flex items-center gap-1 mt-0.5">
-                        <Clock size={10} />
-                        {formatTime(sess.updated_at || sess.created_at)}
-                      </span>
+                  <button
+                    onClick={() => {
+                      onSelectSession(sess.id);
+                      if (onCloseMobile) onCloseMobile();
+                    }}
+                    className={`w-full text-left p-2.5 rounded-lg text-xs transition-all group relative flex items-start justify-between gap-2 ${
+                      isActive
+                        ? 'bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'
+                        : 'text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2 min-w-0 flex-1">
+                      <ChatTeardropText
+                        size={14}
+                        className={`mt-0.5 flex-shrink-0 ${
+                          isActive ? 'text-amber-400' : 'text-zinc-400 group-hover:text-zinc-400'
+                        }`}
+                        weight={isActive ? 'fill' : 'regular'}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-zinc-200 leading-tight">
+                          {sess.title || 'Untitled Session'}
+                        </p>
+                        {generatingSessions[sess.id] ? (
+                          <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1.5 mt-0.5 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            <span>Thinking...</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono text-zinc-400 flex items-center gap-1 mt-0.5">
+                            <Clock size={10} />
+                            {formatTime(sess.updated_at || sess.created_at)}
+                            {sess.messages?.length > 0 && (
+                              <>
+                                <span className="text-zinc-600">•</span>
+                                <span>{sess.messages.length} msgs</span>
+                              </>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {isActive && (
-                    <CaretRight size={12} className="text-amber-400 mt-1 flex-shrink-0" />
+                    {isActive && !isHovered && (
+                      <CaretRight size={12} className="text-amber-400 mt-1 flex-shrink-0" />
+                    )}
+                  </button>
+
+                  {/* Delete button - appears on hover */}
+                  {(isHovered || isConfirmDelete) && (
+                    <button
+                      onClick={(e) => handleDeleteClick(e, sess.id)}
+                      title={isConfirmDelete ? "Click again to confirm delete" : "Delete conversation"}
+                      className={`absolute right-2 top-2.5 p-1 rounded transition-all ${
+                        isConfirmDelete
+                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                          : 'bg-zinc-800 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent'
+                      }`}
+                    >
+                      <Trash size={12} weight={isConfirmDelete ? 'fill' : 'regular'} />
+                    </button>
                   )}
-                </button>
+                </div>
               );
             })
           )}

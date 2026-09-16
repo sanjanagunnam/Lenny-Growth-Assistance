@@ -52,6 +52,75 @@ const OLLAMA_MODELS = [
   },
 ];
 
+const GROQ_MODELS = [
+  {
+    id: 'openai/gpt-oss-120b',
+    label: 'GPT-OSS 120B',
+    tag: '⚡ 500 t/s • FREE',
+    desc: 'Flagship 120B reasoning model on Groq LPU',
+  },
+  {
+    id: 'openai/gpt-oss-20b',
+    label: 'GPT-OSS 20B Instant',
+    tag: '⚡ Ultra-Fast',
+    desc: 'Fastest model on Groq — sub-second responses',
+  },
+  {
+    id: 'qwen/qwen3.8-27b',
+    label: 'Qwen 3.8 27B',
+    tag: 'Dense • Reasoning',
+    desc: 'Dense product operator & strategy reasoning',
+  },
+  {
+    id: 'groq/compound',
+    label: 'Groq Compound',
+    tag: 'Compound AI',
+    desc: 'Compound AI multi-system reasoning',
+  },
+];
+
+const CLAUDE_MODELS = [
+  {
+    id: 'claude-sonnet-5-latest',
+    label: 'Claude Sonnet 5',
+    tag: 'Balanced • Fast',
+    desc: 'Latest Sonnet — fast, intelligent, balanced',
+  },
+  {
+    id: 'claude-haiku-4-5-latest',
+    label: 'Claude Haiku 4.5',
+    tag: 'Ultra-Fast',
+    desc: 'Ultra-fast, low-latency for quick answers',
+  },
+  {
+    id: 'claude-opus-5-latest',
+    label: 'Claude Opus 5',
+    tag: 'Most Capable',
+    desc: 'Most capable — deep reasoning & analysis',
+  },
+  {
+    id: 'claude-fable-5-1-latest',
+    label: 'Claude Fable 5.1',
+    tag: 'Creative',
+    desc: 'Creative writing & nuanced storytelling',
+  },
+];
+
+const GEMINI_MODELS = [
+  {
+    id: 'gemini-3.8-flash',
+    label: 'Gemini 3.8 Flash',
+    tag: '⚡ Google • Accurate',
+    desc: 'Google flagship intelligence — zero hallucinations, live world knowledge',
+  },
+  {
+    id: 'gemini-3.6-flash',
+    label: 'Gemini 3.6 Flash',
+    tag: 'High-Speed',
+    desc: 'Ultra high-speed generation with broad factual accuracy',
+  },
+];
+
 export default function Navbar({
   provider,
   setProvider,
@@ -64,8 +133,12 @@ export default function Navbar({
   onToggleCanvas,
   isCanvasOpen,
   hasActiveArtifact,
+  onGoHome,
 }) {
   const isOllama = provider === 'ollama';
+  const isClaude = provider === 'anthropic';
+  const isGroq = provider === 'groq';
+  const isGemini = provider === 'gemini';
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -81,6 +154,11 @@ export default function Navbar({
   }, []);
 
   const activeOllamaModel = OLLAMA_MODELS.find((m) => m.id === model) || OLLAMA_MODELS[0];
+  const activeClaudeModel = CLAUDE_MODELS.find((m) => m.id === model) || CLAUDE_MODELS[0];
+  const activeGroqModel = GROQ_MODELS.find((m) => m.id === model) || GROQ_MODELS[0];
+  const activeGeminiModel = GEMINI_MODELS.find((m) => m.id === model) || GEMINI_MODELS[0];
+  const activeModelLabel = isOllama ? activeOllamaModel.label : isClaude ? activeClaudeModel.label : isGemini ? activeGeminiModel.label : activeGroqModel.label;
+  const activeModels = isOllama ? OLLAMA_MODELS : isClaude ? CLAUDE_MODELS : isGemini ? GEMINI_MODELS : GROQ_MODELS;
 
   return (
     <header className="h-14 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur px-4 flex items-center justify-between select-none z-30">
@@ -94,7 +172,11 @@ export default function Navbar({
           <SidebarSimple size={18} weight="bold" />
         </button>
 
-        <div className="flex items-center gap-2.5">
+        <button
+          onClick={onGoHome}
+          className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity"
+          title="Go to Home"
+        >
           <div className="w-6 h-6 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
             <Sparkle size={14} weight="fill" />
           </div>
@@ -108,7 +190,7 @@ export default function Navbar({
               </span>
             </div>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Middle section: Mode selector */}
@@ -160,13 +242,48 @@ export default function Navbar({
 
         {/* Dynamic Provider & Model Selector */}
         <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-md p-0.5 gap-1">
+          {/* Provider Toggle: Gemini ✨ */}
+          <button
+            onClick={() => {
+              setProvider('gemini');
+              setModel('gemini-3.8-flash');
+              setIsDropdownOpen(false);
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded transition-colors ${
+              isGemini
+                ? 'bg-zinc-800 text-amber-300 font-medium border border-zinc-700'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Sparkle size={13} weight={isGemini ? 'fill' : 'regular'} className={isGemini ? 'text-blue-400' : 'text-zinc-400'} />
+            <span>Gemini</span>
+            {isGemini && <span className="text-[9px] px-1 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded">PRO</span>}
+          </button>
+
+          {/* Provider Toggle: Groq ⚡ */}
+          <button
+            onClick={() => {
+              setProvider('groq');
+              setModel('openai/gpt-oss-120b');
+              setIsDropdownOpen(false);
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded transition-colors ${
+              isGroq
+                ? 'bg-zinc-800 text-amber-300 font-medium border border-zinc-700'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Lightning size={13} weight="fill" />
+            <span>Groq</span>
+            {isGroq && <span className="text-[9px] px-1 py-0.5 bg-green-500/10 text-green-400 border border-green-500/30 rounded">FREE</span>}
+          </button>
+
           {/* Provider Toggle: Ollama */}
           <button
             onClick={() => {
               setProvider('ollama');
-              if (model === 'claude-3-5-sonnet-latest') {
-                setModel('glm-5.3-flash');
-              }
+              setModel('glm-5.3-flash');
+              setIsDropdownOpen(false);
             }}
             className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded transition-colors ${
               isOllama
@@ -178,83 +295,82 @@ export default function Navbar({
             <span>Ollama</span>
           </button>
 
-          {/* Ollama Model Dropdown (Active when Ollama is selected) */}
-          {isOllama && (
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                id="model-selector-dropdown-btn"
-                className="flex items-center gap-1.5 px-2 py-1 text-xs font-mono rounded bg-zinc-950/80 border border-amber-500/30 text-amber-300 hover:border-amber-400 transition-colors"
-                title="Select Ollama Model"
-              >
-                <Lightning size={12} weight="fill" className="text-amber-400" />
-                <span className="font-semibold">{activeOllamaModel.label}</span>
-                <CaretDown size={11} className={`text-zinc-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-64 bg-zinc-950 border border-zinc-800 rounded-lg shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95">
-                  <div className="px-3 py-1 text-[10px] uppercase font-mono tracking-wider text-zinc-500 border-b border-zinc-800/80 mb-1">
-                    Select Ollama Model
-                  </div>
-                  {OLLAMA_MODELS.map((m) => {
-                    const isSelected = model === m.id;
-                    return (
-                      <button
-                        key={m.id}
-                        id={`model-option-${m.id}`}
-                        onClick={() => {
-                          setModel(m.id);
-                          setIsDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
-                          isSelected
-                            ? 'bg-amber-500/10 text-amber-300 font-medium'
-                            : 'text-zinc-300 hover:bg-zinc-900 hover:text-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Check size={12} className={isSelected ? 'text-amber-400 opacity-100' : 'opacity-0'} />
-                          <div>
-                            <div className="font-medium text-xs flex items-center gap-1.5">
-                              <span>{m.label}</span>
-                              {m.id === 'glm-5.3-flash' && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                              )}
-                            </div>
-                            <div className="text-[10px] text-zinc-500 font-mono">{m.desc}</div>
-                          </div>
-                        </div>
-                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
-                          isSelected
-                            ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
-                            : 'bg-zinc-900 border-zinc-800 text-zinc-400'
-                        }`}>
-                          {m.tag}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Provider Toggle: Claude 3.5 */}
+          {/* Provider Toggle: Claude */}
           <button
             onClick={() => {
               setProvider('anthropic');
-              setModel('claude-3-5-sonnet-latest');
+              setModel('claude-sonnet-5-latest');
+              setIsDropdownOpen(false);
             }}
             className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded transition-colors ${
-              !isOllama
+              isClaude
                 ? 'bg-zinc-800 text-amber-300 font-medium border border-zinc-700'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
             <Sparkle size={13} />
-            <span>Claude 3.5</span>
+            <span>Claude</span>
           </button>
+
+          {/* Model Dropdown (works for all providers) */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              id="model-selector-dropdown-btn"
+              className="flex items-center gap-1.5 px-2 py-1 text-xs font-mono rounded bg-zinc-950/80 border border-amber-500/30 text-amber-300 hover:border-amber-400 transition-colors"
+              title="Select Model"
+            >
+              <Lightning size={12} weight="fill" className="text-amber-400" />
+              <span className="font-semibold max-w-[120px] truncate">{activeModelLabel}</span>
+              <CaretDown size={11} className={`text-zinc-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-72 bg-zinc-950 border border-zinc-800 rounded-lg shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95">
+                <div className="px-3 py-1 text-[10px] uppercase font-mono tracking-wider text-zinc-500 border-b border-zinc-800/80 mb-1">
+                  {isOllama ? 'Ollama Local Models' : isGroq ? 'Groq Cloud ⚡ Ultra-Fast (FREE)' : isGemini ? 'Google Gemini ⚡ World Knowledge' : 'Claude Cloud Models'}
+                </div>
+                {activeModels.map((m) => {
+                  const isSelected = model === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      id={`model-option-${m.id}`}
+                      onClick={() => {
+                        setModel(m.id);
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
+                        isSelected
+                          ? 'bg-amber-500/10 text-amber-300 font-medium'
+                          : 'text-zinc-300 hover:bg-zinc-900 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Check size={12} className={isSelected ? 'text-amber-400 opacity-100' : 'opacity-0'} />
+                        <div>
+                          <div className="font-medium text-xs flex items-center gap-1.5">
+                            <span>{m.label}</span>
+                            {(m.id === 'glm-5.3-flash' || m.id === 'claude-sonnet-5-latest' || m.id === 'openai/gpt-oss-120b') && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            )}
+                          </div>
+                          <div className="text-[10px] text-zinc-500 font-mono">{m.desc}</div>
+                        </div>
+                      </div>
+                      <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
+                        isSelected
+                          ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                      }`}>
+                        {m.tag}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Canvas Drawer Toggle Button */}

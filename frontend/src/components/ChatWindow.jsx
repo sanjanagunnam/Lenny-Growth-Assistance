@@ -77,6 +77,7 @@ export default function ChatWindow({
             const isGrounded = msg.epistemic_status === 'GROUNDED';
             const isPartial = msg.epistemic_status === 'PARTIAL';
             const isRefusal = msg.epistemic_status === 'REFUSAL';
+            const isGeneral = msg.epistemic_status === 'GENERAL' || (!hasSources && !isRefusal);
             const confidenceScore = msg.grounding_confidence != null && msg.grounding_confidence > 0
               ? msg.grounding_confidence
               : (hasSources ? (msg.sources.reduce((acc, s) => acc + (s.similarity || 0), 0) / msg.sources.length) : 0);
@@ -116,6 +117,11 @@ export default function ChatWindow({
                         <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono text-[10px] border bg-zinc-900 border-zinc-800 text-zinc-400">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
                           <span>Epistemic Guardrail • Refusal</span>
+                        </div>
+                      ) : isGeneral ? (
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono text-[10px] border bg-cyan-500/10 border-cyan-500/30 text-cyan-300">
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                          <span>Real-World Knowledge • Synthesized</span>
                         </div>
                       ) : null}
 
@@ -232,9 +238,13 @@ export default function ChatWindow({
             <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 animate-pulse">
               <Sparkle size={14} weight="fill" />
             </div>
-            <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-400 flex items-center gap-2">
+            <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-400 flex items-center gap-2.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-              <span>Synthesizing transcript evidence and generating response...</span>
+              <span>
+                {mode === 'ship30'
+                  ? 'Synthesizing product insights & drafting Ship 30 essay...'
+                  : 'Thinking & synthesizing professional response...'}
+              </span>
             </div>
           </div>
         )}

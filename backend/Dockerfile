@@ -14,14 +14,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY backend/requirements.txt /app/backend/requirements.txt
+# Install Python dependencies first (cache layer — only invalidated when requirements change)
+COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /app/backend/requirements.txt
+    pip install --no-cache-dir -r ./backend/requirements.txt
 
-# Copy application and data
-COPY backend /app/backend
-COPY data /app/data
+# Copy application source
+COPY backend ./backend
+
+# data/ is mounted as a volume at runtime via docker-compose — not baked into image
+# This keeps the image small and transcripts updatable without a rebuild.
 
 EXPOSE 8000
 

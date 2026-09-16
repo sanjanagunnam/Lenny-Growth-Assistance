@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
@@ -9,21 +9,33 @@ export default function App() {
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [provider, setProvider] = useState('ollama');
-  const [model, setModel] = useState('glm-5.3-flash');
+  const [provider, setProvider] = useState('groq');
+  const [model, setModel] = useState('openai/gpt-oss-120b');
   const [mode, setMode] = useState('chat'); // 'chat' | 'ship30'
   const [activeArtifact, setActiveArtifact] = useState(null);
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingSessions, setGeneratingSessions] = useState({}); // { [sessionId]: boolean }
   const [errorBanner, setErrorBanner] = useState(null);
-  const [circuitBreakerToast, setCircuitBreakerToast] = useState(null); // { message, lastPrompt }
+  const [circuitBreakerToast, setCircuitBreakerToast] = useState(null);
+
+  // Keep a ref to activeSessionId for async closures
+  const activeSessionRef = useRef(activeSessionId);
+  useEffect(() => {
+    activeSessionRef.current = activeSessionId;
+  }, [activeSessionId]);
+
+  // Derive whether the currently viewed conversation is generating
+  const isCurrentGenerating = !!(activeSessionId && generatingSessions[activeSessionId]);
+
+  // Per-conversation message cache to avoid refetching on switch
+  const conversationCache = useRef({});
 
   const [health, setHealth] = useState({
     status: 'healthy',
     database: true,
     ollama: true,
-    providers_available: ['ollama'],
+    providers_available: ['ollama', 'anthropic'],
   });
 
   // 1. Health Diagnostics Polling
@@ -41,7 +53,7 @@ export default function App() {
 
   useEffect(() => {
     checkHealth();
-    const interval = setInterval(checkHealth, 10000);
+    const interval = setInterval(checkHealth, 30000);
     return () => clearInterval(interval);
   }, [checkHealth]);
 
@@ -62,52 +74,127 @@ export default function App() {
     fetchSessions();
   }, [fetchSessions]);
 
-  // 3. Load Active Session Messages
+  // 3. Create New Session — fully isolates state immediately
+  const handleNewSession = useCallback(() => {
+    // Cache current conversation before creating new
+    if (activeSessionId && messages.length > 0) {
+      conversationCache.current[activeSessionId] = {
+        messages: [...messages],
+        artifact: activeArtifact,
+      };
+    }
+    setActiveSessionId(null);
+    activeSessionRef.current = null;
+    setMessages([]);
+    setActiveArtifact(null);
+    setIsCanvasOpen(false);
+    setErrorBanner(null);
+    setCircuitBreakerToast(null);
+  }, [activeSessionId, messages, activeArtifact]);
+
+  // 4. Load Active Session Messages (with instant cache + guaranteed authoritative fetch)
   const loadSession = useCallback(async (sessionId) => {
     if (!sessionId) {
-      setActiveSessionId(null);
-      setMessages([]);
+      handleNewSession();
       return;
     }
+    if (activeSessionId === sessionId) return;
+
+    // Save current conversation to cache before switching
+    if (activeSessionId && messages.length > 0) {
+      conversationCache.current[activeSessionId] = {
+        messages: [...messages],
+        artifact: activeArtifact,
+      };
+    }
+
     setActiveSessionId(sessionId);
+    activeSessionRef.current = sessionId;
+    setErrorBanner(null);
+
+    // 1. Check cache first for instant switch
+    if (conversationCache.current[sessionId]?.messages?.length > 0) {
+      const cached = conversationCache.current[sessionId];
+      setMessages(cached.messages);
+      if (cached.artifact) {
+        setActiveArtifact(cached.artifact);
+      } else {
+        setActiveArtifact(null);
+        setIsCanvasOpen(false);
+      }
+    } else {
+      setMessages([]);
+      setActiveArtifact(null);
+      setIsCanvasOpen(false);
+    }
+
+    // 2. Authoritative fetch from server to guarantee completed answers are displayed
     try {
       const res = await fetch(`/api/v1/sessions/${sessionId}`);
       if (res.ok) {
         const data = await res.json();
         const loadedMessages = data.messages || [];
-        setMessages(loadedMessages);
 
         // Find latest artifact if present
         const lastWithArtifact = [...loadedMessages].reverse().find(
           (m) => m.artifact_content || (m.artifact && m.artifact.content)
         );
-        if (lastWithArtifact) {
-          const art = lastWithArtifact.artifact || {
-            type: lastWithArtifact.artifact_type || 'markdown',
-            title: 'Generated Artifact',
-            content: lastWithArtifact.artifact_content,
-          };
-          setActiveArtifact(art);
+        const art = lastWithArtifact
+          ? (lastWithArtifact.artifact || {
+              type: lastWithArtifact.artifact_type || 'markdown',
+              title: 'Generated Artifact',
+              content: lastWithArtifact.artifact_content,
+            })
+          : null;
+
+        // Update cache with authoritative backend data
+        conversationCache.current[sessionId] = {
+          messages: loadedMessages,
+          artifact: art,
+        };
+
+        // ONLY update the active screen if the user is STILL looking at this session
+        if (activeSessionRef.current === sessionId) {
+          setMessages(loadedMessages);
+          if (art) {
+            setActiveArtifact(art);
+          } else {
+            setActiveArtifact(null);
+            setIsCanvasOpen(false);
+          }
         }
       }
     } catch (err) {
       console.error('Failed to load session history:', err);
     }
-  }, []);
+  }, [activeSessionId, messages, activeArtifact, handleNewSession]);
 
-  // 4. Create New Session
-  const handleNewSession = () => {
-    setActiveSessionId(null);
-    setMessages([]);
-    setActiveArtifact(null);
-    setIsCanvasOpen(false);
-    setErrorBanner(null);
-  };
+  // 5. Delete Session
+  const handleDeleteSession = useCallback(async (sessionId) => {
+    try {
+      const res = await fetch(`/api/v1/sessions/${sessionId}`, { method: 'DELETE' });
+      if (res.ok || res.status === 204) {
+        // Remove from cache
+        delete conversationCache.current[sessionId];
+        // If deleting active session, clear state
+        if (sessionId === activeSessionId) {
+          setActiveSessionId(null);
+          activeSessionRef.current = null;
+          setMessages([]);
+          setActiveArtifact(null);
+          setIsCanvasOpen(false);
+        }
+        // Refresh sessions list
+        fetchSessions();
+      }
+    } catch (err) {
+      console.error('Failed to delete session:', err);
+    }
+  }, [activeSessionId, fetchSessions]);
 
-  // 5. Send Message & Chat Generation
+  // 6. Send Message & Chat Generation (Multi-Thread Concurrent & Strictly Isolated)
   const handleSendMessage = async (text, overrideMode = null, overrideProvider = null) => {
     setErrorBanner(null);
-    setIsGenerating(true);
 
     const activeMode = overrideMode || mode;
     if (overrideMode && overrideMode !== mode) {
@@ -118,25 +205,47 @@ export default function App() {
     if (overrideProvider && overrideProvider !== provider) {
       setProvider(overrideProvider);
       if (overrideProvider === 'anthropic') {
-        setModel('claude-3-5-sonnet-latest');
+        setModel('claude-3-5-sonnet-20241022');
       }
     }
 
-    // Optimistically append user message
+    // Resolve target session ID: either current active session or a brand new unique ID
+    const targetSessionId = activeSessionId || `sess_${Date.now()}`;
+    if (!activeSessionId) {
+      setActiveSessionId(targetSessionId);
+      activeSessionRef.current = targetSessionId;
+    }
+
+    // Mark this specific session as generating in background
+    setGeneratingSessions((prev) => ({ ...prev, [targetSessionId]: true }));
+
+    // Optimistically create user message
     const tempUserMsg = {
       id: Date.now(),
       role: 'user',
       content: text,
       created_at: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, tempUserMsg]);
+
+    // Update conversation cache for target session
+    const prevCached = conversationCache.current[targetSessionId]?.messages || [];
+    const updatedMessages = [...prevCached, tempUserMsg];
+    conversationCache.current[targetSessionId] = {
+      messages: updatedMessages,
+      artifact: conversationCache.current[targetSessionId]?.artifact || null,
+    };
+
+    // ONLY update screen if user is currently looking at this session
+    if (activeSessionRef.current === targetSessionId) {
+      setMessages(updatedMessages);
+    }
 
     try {
       const payload = {
         message: text,
-        session_id: activeSessionId || undefined,
+        session_id: targetSessionId,
         provider: activeProvider,
-        model: activeProvider === 'anthropic' ? 'claude-3-5-sonnet-latest' : model,
+        model: model,
         mode: activeMode,
       };
 
@@ -154,7 +263,6 @@ export default function App() {
           errData?.message ||
           `Request failed with status ${res.status}`;
 
-        // Circuit breaker check: If 504 or timeout error from Ollama
         if (res.status === 504 || errData?.detail?.error === 'LLM_TIMEOUT' || detailMsg.toLowerCase().includes('timed out')) {
           setCircuitBreakerToast({
             message: detailMsg,
@@ -169,7 +277,7 @@ export default function App() {
       // Successful response dismisses circuit breaker toast
       setCircuitBreakerToast(null);
 
-      // Append assistant message with grounding telemetry
+      // Construct assistant message
       const assistantMsg = {
         id: data.message_id || Date.now() + 1,
         role: 'assistant',
@@ -182,35 +290,52 @@ export default function App() {
         created_at: new Date().toISOString(),
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      // Update cache for this session
+      const currentHistory = conversationCache.current[targetSessionId]?.messages || [];
+      const finalMessages = [...currentHistory.filter(m => m.id !== tempUserMsg.id), tempUserMsg, assistantMsg];
+      conversationCache.current[targetSessionId] = {
+        messages: finalMessages,
+        artifact: data.artifact || conversationCache.current[targetSessionId]?.artifact || null,
+      };
 
-      // If active session wasn't set, update it
-      if (data.session_id && data.session_id !== activeSessionId) {
-        setActiveSessionId(data.session_id);
-        fetchSessions();
-      }
+      // Refresh session list so updated title and message counts appear in sidebar
+      fetchSessions();
 
-      // If an artifact was emitted, open Canvas drawer automatically
-      if (data.artifact) {
-        setActiveArtifact(data.artifact);
-        setIsCanvasOpen(true);
+      // ONLY update the active screen if the user is STILL on targetSessionId!
+      if (activeSessionRef.current === targetSessionId) {
+        setMessages(finalMessages);
+        if (data.artifact) {
+          setActiveArtifact(data.artifact);
+          setIsCanvasOpen(true);
+        }
       }
     } catch (err) {
       console.error('Chat error:', err);
-      setErrorBanner(err.message);
-      // Append warning bubble in chat
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          role: 'assistant',
-          content: `⚠️ **Operational Alert**: ${err.message}`,
-          sources: [],
-          created_at: new Date().toISOString(),
-        },
-      ]);
+      const alertMsg = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: `⚠️ **Operational Alert**: ${err.message}`,
+        sources: [],
+        created_at: new Date().toISOString(),
+      };
+      const currentHistory = conversationCache.current[targetSessionId]?.messages || [];
+      const finalMessages = [...currentHistory, alertMsg];
+      conversationCache.current[targetSessionId] = {
+        messages: finalMessages,
+        artifact: conversationCache.current[targetSessionId]?.artifact || null,
+      };
+
+      if (activeSessionRef.current === targetSessionId) {
+        setErrorBanner(err.message);
+        setMessages(finalMessages);
+      }
     } finally {
-      setIsGenerating(false);
+      // Clear generating status for this session
+      setGeneratingSessions((prev) => {
+        const next = { ...prev };
+        delete next[targetSessionId];
+        return next;
+      });
     }
   };
 
@@ -220,7 +345,7 @@ export default function App() {
     setCircuitBreakerToast(null);
     setErrorBanner(null);
     setProvider('anthropic');
-    setModel('claude-3-5-sonnet-latest');
+    setModel('claude-3-5-sonnet-20241022');
     handleSendMessage(promptToRetry, mode, 'anthropic');
   };
 
@@ -244,6 +369,7 @@ export default function App() {
         onToggleCanvas={() => setIsCanvasOpen((prev) => !prev)}
         isCanvasOpen={isCanvasOpen}
         hasActiveArtifact={!!activeArtifact}
+        onGoHome={handleNewSession}
       />
 
       {/* Global Alert Banner if degraded */}
@@ -275,7 +401,7 @@ export default function App() {
               </div>
               <div>
                 <h4 className="text-xs font-semibold text-zinc-100 mb-0.5">
-                  Local Model Timeout (15s Circuit Breaker)
+                  Local Model Timeout (Circuit Breaker)
                 </h4>
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
                   {circuitBreakerToast.message}
@@ -315,8 +441,10 @@ export default function App() {
           isOpen={isSidebarOpen}
           sessions={sessions}
           activeSessionId={activeSessionId}
+          generatingSessions={generatingSessions}
           onSelectSession={loadSession}
           onNewSession={handleNewSession}
+          onDeleteSession={handleDeleteSession}
           onCloseMobile={() => setIsSidebarOpen(false)}
         />
 
@@ -324,7 +452,7 @@ export default function App() {
         <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
           <ChatWindow
             messages={messages}
-            isGenerating={isGenerating}
+            isGenerating={isCurrentGenerating}
             onSendMessage={handleSendMessage}
             onOpenArtifact={handleOpenArtifact}
             activeArtifact={activeArtifact}

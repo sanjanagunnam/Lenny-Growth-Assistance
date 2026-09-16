@@ -40,6 +40,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             err,
         )
 
+    # Pre-warm local Ollama model in memory in background so first user query has zero load delay
+    import asyncio
+    async def warmup_ollama():
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=35.0) as client:
+                logger.info("Pre-warming Ollama model '%s' in memory...", settings.OLLAMA_DEFAULT_MODEL)
+                await client.post(
+                    f"{settings.OLLAMA_BASE_URL}/api/generate",
+                    json={
+                        "model": settings.OLLAMA_DEFAULT_MODEL,
+                        "prompt": "Hi",
+                        "stream": False,
+                        "keep_alive": -1,
+                        "options": {"num_predict": 1, "num_ctx": 1024, "num_thread": 8},
+                    },
+                )
+                logger.info("Ollama model '%s' is pre-warmed and resident in memory.", settings.OLLAMA_DEFAULT_MODEL)
+        except Exception as e:
+            logger.debug("Ollama warmup notice: %s", e)
+
+    asyncio.create_task(warmup_ollama())
+
     yield
 
     logger.info("Shutting down Lenny Growth Assistant API.")
@@ -101,6 +124,29 @@ async def llm_bridge_exception_handler(request: Request, exc: LLMBridgeError) ->
 
 # Register API router
 app.include_router(api_router)
+
+
+@app.get("/health", include_in_schema=False)
+def health_alias():
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url="/healthz")
+
+
+@app.get("/api/v1/health", include_in_schema=False)
+def api_v1_health_alias():
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url="/healthz")
+
+
+@app.get("/health/db", include_in_schema=False)
+def health_db_alias():
+    ok = ping_db()
+    return {"status": "healthy" if ok else "unhealthy", "database": ok}
+
+
+@app.get("/health/llm", include_in_schema=False)
+def health_llm_alias():
+    return {"status": "healthy", "providers": ["ollama", "gemini", "groq", "openai", "anthropic"]}
 
 
 @app.get("/", tags=["Root"])
