@@ -3,7 +3,14 @@ import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
 import ArtifactViewer from './components/ArtifactViewer';
-import { WarningCircle, Lightning, ArrowClockwise, X } from '@phosphor-icons/react';
+import { 
+  Sparkle, 
+  TrendUp,
+  WarningCircle, 
+  ArrowClockwise,
+} from '@phosphor-icons/react';
+
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 export default function App() {
   const [sessions, setSessions] = useState([]);
@@ -41,7 +48,7 @@ export default function App() {
   // 1. Health Diagnostics Polling
   const checkHealth = useCallback(async () => {
     try {
-      const res = await fetch('/healthz');
+      const res = await fetch(`${API_BASE}/healthz`);
       if (res.ok) {
         const data = await res.json();
         setHealth(data);
@@ -60,7 +67,7 @@ export default function App() {
   // 2. Fetch Sessions List
   const fetchSessions = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/sessions');
+      const res = await fetch(`${API_BASE}/api/v1/sessions`);
       if (res.ok) {
         const data = await res.json();
         setSessions(data.sessions || []);
@@ -130,7 +137,7 @@ export default function App() {
 
     // 2. Authoritative fetch from server to guarantee completed answers are displayed
     try {
-      const res = await fetch(`/api/v1/sessions/${sessionId}`);
+      const res = await fetch(`${API_BASE}/api/v1/sessions/${sessionId}`);
       if (res.ok) {
         const data = await res.json();
         const loadedMessages = data.messages || [];
@@ -172,7 +179,7 @@ export default function App() {
   // 5. Delete Session
   const handleDeleteSession = useCallback(async (sessionId) => {
     try {
-      const res = await fetch(`/api/v1/sessions/${sessionId}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/api/v1/sessions/${sessionId}`, { method: 'DELETE' });
       if (res.ok || res.status === 204) {
         // Remove from cache
         delete conversationCache.current[sessionId];
@@ -249,7 +256,7 @@ export default function App() {
         mode: activeMode,
       };
 
-      const res = await fetch('/api/v1/chat', {
+      const res = await fetch(`${API_BASE}/api/v1/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
