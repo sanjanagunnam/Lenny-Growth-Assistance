@@ -3,6 +3,7 @@ import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
 import ArtifactViewer from './components/ArtifactViewer';
+import LandingPage from './components/LandingPage';
 import { 
   Sparkle, 
   TrendUp,
@@ -13,6 +14,7 @@ import {
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 export default function App() {
+  const [currentView, setCurrentView] = useState('landing'); // 'landing' | 'chat'
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -361,10 +363,17 @@ export default function App() {
     setIsCanvasOpen(true);
   };
 
+  const handleSelectLandingPrompt = (promptText) => {
+    setCurrentView('chat');
+    handleSendMessage(promptText);
+  };
+
   return (
-    <div className="min-h-[100dvh] h-[100dvh] bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden font-sans">
+    <div className="min-h-[100dvh] h-[100dvh] bg-[#090d16] text-zinc-100 flex flex-col overflow-hidden font-sans">
       {/* Top Navbar */}
       <Navbar
+        currentView={currentView}
+        setCurrentView={setCurrentView}
         provider={provider}
         setProvider={setProvider}
         model={model}
@@ -379,101 +388,116 @@ export default function App() {
         onGoHome={handleNewSession}
       />
 
-      {/* Global Alert Banner if degraded */}
-      {errorBanner && (
-        <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-1.5 text-xs text-amber-300 flex items-center justify-between font-mono">
-          <div className="flex items-center gap-2">
-            <WarningCircle size={14} weight="bold" />
-            <span>{errorBanner}</span>
-          </div>
-          <button
-            onClick={() => setErrorBanner(null)}
-            className="text-amber-400 hover:text-amber-200 text-xs"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* Circuit Breaker Non-Blocking Toast Banner */}
-      {circuitBreakerToast && (
-        <aside
-          aria-label="Operational Alert"
-          className="fixed bottom-20 right-6 z-50 max-w-md w-full p-4 rounded-xl bg-zinc-900 border border-amber-500/40 shadow-2xl shadow-amber-500/10 backdrop-blur-md flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200"
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-start gap-2.5">
-              <div className="w-6 h-6 rounded-md bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 flex-shrink-0 mt-0.5">
-                <Lightning size={14} weight="fill" />
-              </div>
-              <div>
-                <h4 className="text-xs font-semibold text-zinc-100 mb-0.5">
-                  Local Model Timeout (Circuit Breaker)
-                </h4>
-                <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  {circuitBreakerToast.message}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setCircuitBreakerToast(null)}
-              className="text-zinc-500 hover:text-zinc-300 p-1"
-            >
-              <X size={14} />
-            </button>
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-1 border-t border-zinc-800/80">
-            <button
-              onClick={() => setCircuitBreakerToast(null)}
-              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
-            >
-              Dismiss
-            </button>
-            <button
-              onClick={handleSwitchToClaudeAndRetry}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold transition-all shadow-sm"
-            >
-              <ArrowClockwise size={13} weight="bold" />
-              <span>Switch to Claude & Retry</span>
-            </button>
-          </div>
-        </aside>
-      )}
-
-      {/* Main Split-View Workspace */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Sidebar */}
-        <Sidebar
-          isOpen={isSidebarOpen}
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          generatingSessions={generatingSessions}
-          onSelectSession={loadSession}
-          onNewSession={handleNewSession}
-          onDeleteSession={handleDeleteSession}
-          onCloseMobile={() => setIsSidebarOpen(false)}
-        />
-
-        {/* Center / Left Pane: Chat Stream */}
-        <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-          <ChatWindow
-            messages={messages}
-            isGenerating={isCurrentGenerating}
-            onSendMessage={handleSendMessage}
-            onOpenArtifact={handleOpenArtifact}
-            activeArtifact={activeArtifact}
-            mode={mode}
+      {/* VIEW 1: LANDING PAGE */}
+      {currentView === 'landing' ? (
+        <main className="flex-1 overflow-y-auto">
+          <LandingPage
+            onStartChat={() => setCurrentView('chat')}
+            onSelectPrompt={handleSelectLandingPrompt}
+            health={health}
+            backendUrl={API_BASE}
           />
         </main>
+      ) : (
+        /* VIEW 2: CHAT ASSISTANT WORKSPACE */
+        <>
+          {/* Global Alert Banner if degraded */}
+          {errorBanner && (
+            <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-1.5 text-xs text-amber-300 flex items-center justify-between font-mono">
+              <div className="flex items-center gap-2">
+                <WarningCircle size={14} weight="bold" />
+                <span>{errorBanner}</span>
+              </div>
+              <button
+                onClick={() => setErrorBanner(null)}
+                className="text-amber-400 hover:text-amber-200 text-xs"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
-        {/* Right Pane: Growth Canvas / Artifact Drawer */}
-        <ArtifactViewer
-          artifact={activeArtifact}
-          isOpen={isCanvasOpen}
-          onClose={() => setIsCanvasOpen(false)}
-        />
-      </div>
+          {/* Circuit Breaker Non-Blocking Toast Banner */}
+          {circuitBreakerToast && (
+            <aside
+              aria-label="Operational Alert"
+              className="fixed bottom-20 right-6 z-50 max-w-md w-full p-4 rounded-xl bg-zinc-900 border border-amber-500/40 shadow-2xl shadow-amber-500/10 backdrop-blur-md flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded-md bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 flex-shrink-0 mt-0.5">
+                    <Lightning size={14} weight="fill" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-semibold text-zinc-100 mb-0.5">
+                      Local Model Timeout (Circuit Breaker)
+                    </h4>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      {circuitBreakerToast.message}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCircuitBreakerToast(null)}
+                  className="text-zinc-500 hover:text-zinc-300 p-1"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1 border-t border-zinc-800/80">
+                <button
+                  onClick={() => setCircuitBreakerToast(null)}
+                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
+                >
+                  Dismiss
+                </button>
+                <button
+                  onClick={handleSwitchToClaudeAndRetry}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold transition-all shadow-sm"
+                >
+                  <ArrowClockwise size={13} weight="bold" />
+                  <span>Switch to Claude & Retry</span>
+                </button>
+              </div>
+            </aside>
+          )}
+
+          {/* Main Split-View Workspace */}
+          <div className="flex-1 flex overflow-hidden relative">
+            {/* Left Sidebar */}
+            <Sidebar
+              isOpen={isSidebarOpen}
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              generatingSessions={generatingSessions}
+              onSelectSession={loadSession}
+              onNewSession={handleNewSession}
+              onDeleteSession={handleDeleteSession}
+              onCloseMobile={() => setIsSidebarOpen(false)}
+            />
+
+            {/* Center / Left Pane: Chat Stream */}
+            <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+              <ChatWindow
+                messages={messages}
+                isGenerating={isCurrentGenerating}
+                onSendMessage={handleSendMessage}
+                onOpenArtifact={handleOpenArtifact}
+                activeArtifact={activeArtifact}
+                mode={mode}
+              />
+            </main>
+
+            {/* Right Pane: Growth Canvas / Artifact Drawer */}
+            <ArtifactViewer
+              artifact={activeArtifact}
+              isOpen={isCanvasOpen}
+              onClose={() => setIsCanvasOpen(false)}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -11,7 +11,9 @@ import {
   Layout,
   CaretDown,
   Check,
-  Lightning
+  Lightning,
+  ArrowRight,
+  House
 } from '@phosphor-icons/react';
 
 const OLLAMA_MODELS = [
@@ -122,6 +124,8 @@ const GEMINI_MODELS = [
 ];
 
 export default function Navbar({
+  currentView = 'landing',
+  setCurrentView,
   provider,
   setProvider,
   model,
@@ -160,10 +164,64 @@ export default function Navbar({
   const activeModelLabel = isOllama ? activeOllamaModel.label : isClaude ? activeClaudeModel.label : isGemini ? activeGeminiModel.label : activeGroqModel.label;
   const activeModels = isOllama ? OLLAMA_MODELS : isClaude ? CLAUDE_MODELS : isGemini ? GEMINI_MODELS : GROQ_MODELS;
 
+  // LANDING PAGE HEADER
+  if (currentView === 'landing') {
+    return (
+      <header className="h-16 fixed top-0 inset-x-0 border-b border-white/5 bg-[#090d16]/90 backdrop-blur-2xl px-5 sm:px-10 flex items-center justify-between select-none z-50">
+        {/* Brand */}
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 via-indigo-500 to-purple-500 p-0.5 shadow-lg shadow-sky-500/25 shrink-0">
+            <div className="w-full h-full bg-[#090d16] rounded-[10px] flex items-center justify-center text-sky-400">
+              <Sparkle size={18} weight="fill" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-base font-bold text-white tracking-tight">Lenny AI</span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/25">v1.0</span>
+          </div>
+        </div>
+
+        {/* Center Nav Tabs */}
+        <div className="hidden md:flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.04] border border-white/8 text-xs font-medium">
+          <button
+            onClick={() => setCurrentView?.('landing')}
+            className="px-3.5 py-1.5 rounded-lg bg-white/10 text-white shadow-sm font-semibold transition-all"
+          >
+            Overview & Architecture
+          </button>
+          <button
+            onClick={() => setCurrentView?.('chat')}
+            className="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition-colors"
+          >
+            Chat Workspace
+          </button>
+        </div>
+
+        {/* Right Action & Connectivity Indicator */}
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/8 text-xs font-mono text-slate-300">
+            <span className={`w-2 h-2 rounded-full ${health?.status === 'healthy' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span>{health?.status === 'healthy' ? 'RAG Stack Live' : 'Connecting...'}</span>
+          </div>
+
+          <button
+            onClick={() => setCurrentView?.('chat')}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-sky-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <ChatCircleText size={16} weight="fill" />
+            <span>Open Chat</span>
+            <ArrowRight size={14} weight="bold" />
+          </button>
+        </div>
+      </header>
+    );
+  }
+
+  // CHAT WORKSPACE HEADER
   return (
     <header className="h-14 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur px-4 flex items-center justify-between select-none z-30">
       {/* Left section: Sidebar toggle & Branding */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         <button
           onClick={onToggleSidebar}
           aria-label="Toggle Sessions Sidebar"
@@ -173,22 +231,29 @@ export default function Navbar({
         </button>
 
         <button
+          onClick={() => setCurrentView?.('landing')}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all text-xs font-medium"
+          title="Back to Landing Page Overview"
+        >
+          <House size={14} />
+          <span className="hidden sm:inline">Overview</span>
+        </button>
+
+        <button
           onClick={onGoHome}
-          className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity"
-          title="Go to Home"
+          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+          title="Reset Active Session"
         >
           <div className="w-6 h-6 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
             <Sparkle size={14} weight="fill" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm tracking-tight text-zinc-100">
-                Lenny Growth Assistant
-              </span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300">
-                v1.0
-              </span>
-            </div>
+          <div className="hidden lg:flex items-center gap-2">
+            <span className="font-semibold text-sm tracking-tight text-zinc-100">
+              Lenny AI
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300">
+              v1.0
+            </span>
           </div>
         </button>
       </div>
