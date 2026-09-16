@@ -51,19 +51,16 @@ class AgentOrchestrator:
     def __init__(self, llm_bridge: Optional[LLMBridge] = None):
         self.llm_bridge = llm_bridge or LLMBridge()
 
-    def _format_context_block(self, sources: List[Dict[str, Any]], max_chunks: int = 2, max_chars_per_chunk: int = 1200) -> str:
-        """Format retrieved chunks into a concise, high-signal context block for the LLM."""
+    def _format_context_block(self, sources: List[Dict[str, Any]], max_chunks: int = 4) -> str:
+        """Format retrieved chunks into complete, rich context blocks for the LLM."""
         if not sources:
             return ""
 
         blocks = []
-        # Keep top N most relevant chunks to preserve low latency on CPU
         for idx, s in enumerate(sources[:max_chunks], 1):
             guest = s.get("guest_name", "Unknown Guest")
             file_name = s.get("source_file", "Transcript")
             content = s.get("content", "").strip()
-            if len(content) > max_chars_per_chunk:
-                content = content[:max_chars_per_chunk] + "..."
             sim = s.get("similarity", 0.0)
             blocks.append(
                 f"[Chunk {idx} | Source: {file_name} | Guest: {guest} | Relevance: {sim:.2f}]\n{content}"
@@ -126,13 +123,13 @@ class AgentOrchestrator:
         if sources:
             avg_sim = round(float(sum(s.get("similarity", 0.0) for s in sources) / len(sources)), 4)
             confidence = min(max(avg_sim, 0.0), 1.0)
-            epistemic_status = "GROUNDED" if confidence >= 0.75 else "PARTIAL"
+            epistemic_status = "GROUNDED" if confidence >= 0.60 else "PARTIAL"
         else:
             confidence = 0.0
             epistemic_status = "REFUSAL"
 
         # 2. Strict Epistemic Gating:
-        # If no transcript chunks exceed 0.65 similarity, refuse immediately
+        # If no transcript chunks exceed similarity threshold, refuse immediately
         if not sources:
             # Check if there is existing session context from prior conversation turns
             has_prior_history = (
@@ -141,7 +138,7 @@ class AgentOrchestrator:
                 and any(m.role == "assistant" for m in session.messages)
             )
             if not has_prior_history:
-                logger.info("Refusal triggered: query '%s' yielded 0 chunks >= 0.65 and no prior assistant history", cleaned_query)
+                logger.info("Refusal triggered: query '%s' yielded 0 chunks >= threshold and no prior assistant history", cleaned_query)
                 return {
                     "reply": STRICT_REFUSAL_MESSAGE,
                     "sources": [],
@@ -182,8 +179,8 @@ class AgentOrchestrator:
         # 6. Parse and isolate artifacts
         clean_reply, artifact = parse_artifact_from_text(raw_response)
 
-        # If the model itself generated the refusal, ensure sources and artifacts are empty
-        if STRICT_REFUSAL_MESSAGE in clean_reply:
+        # If strictly refused by model without valid sources, return formal refusal
+        if not sources or (clean_reply.strip() == STRICT_REFUSAL_MESSAGE):
             return {
                 "reply": STRICT_REFUSAL_MESSAGE,
                 "sources": [],

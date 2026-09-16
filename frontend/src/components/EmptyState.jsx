@@ -14,7 +14,7 @@ const EVALUATOR_PRESETS = [
     id: 'eval-rag',
     badge: 'RUBRIC 1 • GROUNDED RAG',
     title: 'Ask Grounded Growth Question',
-    prompt: "How does Brian Chesky explain Airbnb's growth loops versus paid performance marketing?",
+    prompt: "What are the 3 non-obvious retention levers recommended by Lenny's guests for consumer apps?",
     description: "Evaluates multi-chunk vector retrieval, guest extraction, and precise transcript grounding with cosine threshold verification.",
     icon: TrendUp,
     accent: 'amber',

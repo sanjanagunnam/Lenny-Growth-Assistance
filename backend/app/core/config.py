@@ -33,7 +33,7 @@ class Settings(BaseSettings):
         description="Embedding model for Ollama",
     )
     OLLAMA_TIMEOUT_SECONDS: float = Field(
-        default=120.0,
+        default=300.0,
         description="Timeout in seconds for Ollama API requests",
     )
 
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
 
     # RAG Retrieval parameters
     SIMILARITY_THRESHOLD: float = Field(
-        default=0.65,
+        default=0.48,
         description="Minimum cosine similarity cutoff for grounding citations",
     )
     RETRIEVAL_TOP_K: int = Field(
