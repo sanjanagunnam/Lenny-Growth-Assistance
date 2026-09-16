@@ -7,7 +7,16 @@ from typing import AsyncGenerator
 import uuid
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+import sys
+from pathlib import Path
+
+# Ensure project root and backend directories are in sys.path
+_current_dir = Path(__file__).resolve().parent
+_backend_dir = _current_dir.parent
+_root_dir = _backend_dir.parent
+for _p in [str(_root_dir), str(_backend_dir)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from backend.app.api.routes import router as api_router
 from backend.app.core.config import settings

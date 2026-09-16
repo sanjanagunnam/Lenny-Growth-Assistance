@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: lenny-growth-backend
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DEFAULT_PROVIDER
+        value: groq
+      - key: GROQ_DEFAULT_MODEL
+        value: openai/gpt-oss-120b
+      - key: DATABASE_URL
+        value: sqlite:///./lenny_growth_local.db
+      - key: LOG_LEVEL
+        value: INFO
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
